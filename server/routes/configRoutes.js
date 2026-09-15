@@ -311,10 +311,40 @@ router.put("/sidebar", protectAdmin, async (req, res) => {
   }
 });
 
-// Admin updates 10-day Aarti schedule & host buildings
+// Admin updates Festival Schedule Card (Event Details, Planner & Photo)
+router.put("/festival-schedule-card", protectAdmin, async (req, res) => {
+  try {
+    const { festivalScheduleCard } = req.body;
+    let config = await TabConfig.findOne();
+    if (!config) {
+      config = new TabConfig();
+    }
+
+    if (festivalScheduleCard) {
+      config.festivalScheduleCard = {
+        ...(config.festivalScheduleCard?.toObject ? config.festivalScheduleCard.toObject() : config.festivalScheduleCard),
+        ...festivalScheduleCard
+      };
+      config.markModified("festivalScheduleCard");
+    }
+    config.updatedAt = Date.now();
+    await config.save();
+
+    res.json({
+      success: true,
+      message: "Festival schedule card updated successfully",
+      festivalScheduleCard: config.festivalScheduleCard
+    });
+  } catch (error) {
+    console.error("[Config] Error updating festival schedule card:", error.message);
+    res.status(500).json({ success: false, message: "Failed to update festival schedule card" });
+  }
+});
+
+// Admin updates 10-day Aarti schedule & host buildings (and optionally festivalScheduleCard)
 router.put("/aarti-schedule", protectAdmin, async (req, res) => {
   try {
-    const { dailyAartiSchedule } = req.body;
+    const { dailyAartiSchedule, festivalScheduleCard } = req.body;
     let config = await TabConfig.findOne();
     if (!config) {
       config = new TabConfig();
@@ -324,13 +354,21 @@ router.put("/aarti-schedule", protectAdmin, async (req, res) => {
       config.dailyAartiSchedule = dailyAartiSchedule;
       config.markModified("dailyAartiSchedule");
     }
+    if (festivalScheduleCard) {
+      config.festivalScheduleCard = {
+        ...(config.festivalScheduleCard?.toObject ? config.festivalScheduleCard.toObject() : config.festivalScheduleCard),
+        ...festivalScheduleCard
+      };
+      config.markModified("festivalScheduleCard");
+    }
     config.updatedAt = Date.now();
     await config.save();
 
     res.json({
       success: true,
       message: "Daily Aarti schedule updated successfully",
-      dailyAartiSchedule: config.dailyAartiSchedule
+      dailyAartiSchedule: config.dailyAartiSchedule,
+      festivalScheduleCard: config.festivalScheduleCard
     });
   } catch (error) {
     console.error("[Config] Error updating aarti schedule:", error.message);

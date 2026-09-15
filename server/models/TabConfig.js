@@ -45,6 +45,20 @@ const dailyAartiItemSchema = new mongoose.Schema({
   isCurrentDay: { type: Boolean, default: false }
 }, { _id: false, strict: false });
 
+const festivalScheduleCardSchema = new mongoose.Schema({
+  eventNameMr: { type: String, default: "श्री गणेशोत्सव २०२६ (१० दिवसीय भव्य उत्सव)" },
+  eventNameEn: { type: String, default: "Shree Ganeshotsav 2026 (10-Day Grand Celebration)" },
+  eventDescriptionMr: { type: String, default: "म्हाडा टॉवर्स संकुलातील सर्व ४ विंग्ज (G, H, J, K) संयुक्त विद्यमाने आयोजित १० दिवसीय अखंड गणेशोत्सव सोहळा." },
+  eventDescriptionEn: { type: String, default: "10-day grand festival celebration organized jointly by all 4 buildings (Wings G, H, J, K) of MHADA Towers." },
+  plannerMr: { type: String, default: "म्हाडा टॉवर्स उत्सव मंडळ व मध्यवर्ती सोसायटी समिती" },
+  plannerEn: { type: String, default: "MHADA Towers Utsav Mandal & Central Society Committee" },
+  plannerDetailsMr: { type: String, default: "सर्व ४ इमारतींचे विंग प्रमुख व स्वयंसेवक दल (विंग G, H, J, K)" },
+  plannerDetailsEn: { type: String, default: "All 4 Building Wing Leads & Volunteer Squad (Wings G, H, J, K)" },
+  imageUrl: { type: String, default: "" },
+  imageCaptionMr: { type: String, default: "उत्सव वेळापत्रक व संपूर्ण कार्यक्रम रूपरेषा" },
+  imageCaptionEn: { type: String, default: "Festival Schedule & Complete Event Blueprint" }
+}, { _id: false, strict: false });
+
 const newsletterSchema = new mongoose.Schema({
   edition: { type: String, default: "अंक १ (दिवस १ - श्री गणेश चतुर्थी)" },
   editionEn: { type: String, default: "Edition 1 (Day 1 - Ganesh Chaturthi)" },
@@ -322,10 +336,6 @@ const tabConfigSchema = new mongoose.Schema({
     volunteer: {
       type: tabSettingSchema,
       default: { enabled: true, approved: true, labelMr: "स्वयंसेवक सेवा", labelEn: "Volunteer Seva", order: 13 }
-    },
-    chatbot: {
-      type: tabSettingSchema,
-      default: { enabled: true, approved: true, labelMr: "AI बाप्पा सहाय्यक", labelEn: "AI Bappa Assistant", order: 14 }
     },
     whatsapp: {
       type: tabSettingSchema,
@@ -764,6 +774,10 @@ const tabConfigSchema = new mongoose.Schema({
   },
   mandalInfo: {
     type: mandalInfoSchema,
+    default: () => ({})
+  },
+  festivalScheduleCard: {
+    type: festivalScheduleCardSchema,
     default: () => ({})
   },
   updatedAt: { type: Date, default: Date.now }

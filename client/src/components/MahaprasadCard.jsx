@@ -1,20 +1,19 @@
 import React from "react";
 import { UtensilsCrossed, Clock, MapPin, CheckCircle, Ticket, Users } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
+import { useConfig } from "../context/ConfigContext";
+import { getMahaprasadSlots, getAllWingsLabel } from "../utils/wingUtils";
 
 const MahaprasadCard = () => {
   const { language } = useLanguage();
+  const { config } = useConfig();
 
-  const wingSlots = language === "mr" ? [
+  const dynamicSlots = getMahaprasadSlots(config, language);
+  const wingSlots = dynamicSlots.length > 0 ? dynamicSlots : [
     { wing: "G Wing (जी विंग)", slot: "दुपारी १२:३० ते ०१:१५" },
     { wing: "H Wing (एच विंग)", slot: "दुपारी ०१:१५ ते ०२:००" },
     { wing: "J Wing (जे विंग)", slot: "दुपारी ०२:०० ते ०२:४५" },
     { wing: "K Wing व उर्वरित अतिथी (के विंग)", slot: "दुपारी ०२:४५ ते ०३:३०" },
-  ] : [
-    { wing: "G Wing", slot: "12:30 PM to 01:15 PM" },
-    { wing: "H Wing", slot: "01:15 PM to 02:00 PM" },
-    { wing: "J Wing", slot: "02:00 PM to 02:45 PM" },
-    { wing: "K Wing & Guests", slot: "02:45 PM to 03:30 PM" },
   ];
 
   const menuItems = language === "mr" ? [
@@ -42,8 +41,8 @@ const MahaprasadCard = () => {
           </h3>
           <p className="text-xs sm:text-sm text-maroon-700">
             {language === "mr" 
-              ? "५ व्या दिवशी सर्व ४ विंग्समधील (G, H, J, K) मालक, भाडेकरू व कुटुंबीयांसाठी स्नेहभोजन" 
-              : "Day 5 Community Feast for all residents & families across all 4 Wings (G, H, J, K)"}
+              ? `५ व्या दिवशी ${getAllWingsLabel(config, "mr")}मधील मालक, भाडेकरू व कुटुंबीयांसाठी स्नेहभोजन` 
+              : `Day 5 Community Feast for all residents & families across ${getAllWingsLabel(config, "en")}`}
           </p>
         </div>
 

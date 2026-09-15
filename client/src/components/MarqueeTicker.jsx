@@ -2,6 +2,7 @@ import React from "react";
 import { Flame } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
+import { getAllWingsLabel } from "../utils/wingUtils";
 
 const MarqueeTicker = ({ latestAnnouncement, onSelectAnnouncement, onOpenSidebar }) => {
   const { config } = useConfig();
@@ -21,9 +22,11 @@ const MarqueeTicker = ({ latestAnnouncement, onSelectAnnouncement, onOpenSidebar
     ? `${noticeTitle} — ${noticeDesc || ""}`
     : null;
 
+  const wingsLabel = getAllWingsLabel(config, language);
+
   const defaultText = language === "mr"
-    ? "गणपती बाप्पा मोरया! दैनिक महाआरती सकाळी ८:३० व रात्री ८:०० वाजता | महाप्रसाद वाटप ५व्या दिवशी दुपारी १२:३० पासून सुरु | सर्व ४ इमारतींच्या (G, H, J, K) भाविकांनी उपस्थित राहावे."
-    : "Ganpati Bappa Morya! Daily Maha Aarti at 08:30 AM & 08:00 PM | Mahaprasad on Day 5 from 12:30 PM | All residents of 4 Buildings (G, H, J, K) are cordially invited.";
+    ? `गणपती बाप्पा मोरया! दैनिक महाआरती सकाळी ८:३० व रात्री ८:०० वाजता | महाप्रसाद वाटप ५व्या दिवशी दुपारी १२:३० पासून सुरु | ${wingsLabel} मधील भाविकांनी उपस्थित राहावे.`
+    : `Ganpati Bappa Morya! Daily Maha Aarti at 08:30 AM & 08:00 PM | Mahaprasad on Day 5 from 12:30 PM | All residents of ${wingsLabel} are cordially invited.`;
 
   const primaryText = adminMarquee || noticeMarquee || defaultText;
   const secondaryText = adminMarquee && noticeMarquee 
@@ -36,7 +39,7 @@ const MarqueeTicker = ({ latestAnnouncement, onSelectAnnouncement, onOpenSidebar
       <span className="hover:text-gold-300 transition-colors font-semibold">{primaryText}</span>
       <span className="text-gold-400/80">❖</span>
       <span className="text-festive-saffron font-semibold">
-        {language === "mr" ? "४ इमारती (G, H, J, K) म्हाडा टॉवर्स" : "4 Buildings (G, H, J, K) MHADA Towers"}
+        {wingsLabel} • {language === "mr" ? "म्हाडा टॉवर्स" : "MHADA Towers"}
       </span>
       <span className="text-gold-400/80">❖</span>
       {noticeMarquee && adminMarquee ? (

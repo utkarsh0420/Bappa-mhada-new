@@ -10,6 +10,7 @@ import { useConfig } from "../context/ConfigContext";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import { triggerLiveSync, subscribeLiveSync } from "../utils/liveSync";
+import { getAllWingsLabel } from "../utils/wingUtils";
 
 // Local image compression helper for uploading photos from device
 const compressImageFile = (file, maxWidth = 1000, quality = 0.75) => {
@@ -72,8 +73,8 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
     dayNumber: 1,
     venue: "मुख्य मंडप, म्हाडा टॉवर्स",
     venueEn: "Main Pandal, MHADA Towers",
-    hostWing: "सर्व विंग्ज (G, H, J, K)",
-    hostWingEn: "All Wings (G, H, J, K)",
+    hostWing: "",
+    hostWingEn: "",
     descriptionMr: "",
     descriptionEn: "",
     imageUrl: "",
@@ -1327,7 +1328,7 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
                       type="text"
                       value={eventFormData.hostWing}
                       onChange={e => setEventFormData({ ...eventFormData, hostWing: e.target.value })}
-                      placeholder="उदा. सर्व विंग्ज (G, H, J, K)"
+                      placeholder={`उदा. ${getAllWingsLabel(config, language)}`}
                       className="w-full px-3 py-2 rounded-xl bg-white border border-gold-300 text-xs text-maroon-950 font-medium focus:border-amber-500 outline-none"
                     />
                   </div>

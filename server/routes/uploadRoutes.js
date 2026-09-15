@@ -32,21 +32,16 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter: accept image files only
+// File filter: accept all image files and extensions (JPG, PNG, WEBP, GIF, SVG, AVIF, BMP, TIFF, ICO, HEIC, etc.)
 const fileFilter = (req, file, cb) => {
-  const allowedMimes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-    "image/svg+xml",
-    "image/avif",
-  ];
+  const ext = path.extname(file.originalname || "").toLowerCase();
+  const isImageExt = /\.(jpg|jpeg|png|webp|gif|svg|avif|bmp|tiff|tif|ico|heic|heif|jfif|raw|eps)$/i.test(ext);
+  const isImageMime = Boolean(file.mimetype && (file.mimetype.startsWith("image/") || file.mimetype === "application/octet-stream"));
 
-  if (allowedMimes.includes(file.mimetype) || file.mimetype.startsWith("image/")) {
+  if (isImageExt || isImageMime) {
     cb(null, true);
   } else {
-    cb(new Error("Only image files (JPG, PNG, WEBP, GIF, SVG, AVIF) are allowed!"), false);
+    cb(new Error("Only image files (JPG, PNG, WEBP, GIF, SVG, AVIF, BMP, TIFF, etc.) are allowed!"), false);
   }
 };
 

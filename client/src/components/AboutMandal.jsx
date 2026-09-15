@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
+import { getAllWingsShortLabel, getWingCodesText } from "../utils/wingUtils";
 
 const ICON_MAP = {
   HeartHandshake,
@@ -31,7 +32,9 @@ const AboutMandal = () => {
   const address = language === "mr" 
     ? (info.officeAddressMr || config?.addressMr || "पिंपरी वाघेरे, पिंपरी चिंचवड, पुणे - ४११०१७")
     : (info.officeAddressEn || config?.addressEn || "Pimpri Waghere, Pimpri Chinchwad, Pune - 411017");
-  const motto = language === "mr" ? (info.mottoMr || "॥ ४ विंग्स, एकच परिवार - सहकार्य • शिस्त • अखंड भक्ती ॥") : (info.mottoEn || info.mottoMr || "4 Wings, One Family");
+  const motto = language === "mr" 
+    ? (info.mottoMr || `॥ ${getAllWingsShortLabel(config, "mr")} - सहकार्य • शिस्त • अखंड भक्ती ॥`) 
+    : (info.mottoEn || info.mottoMr || `॥ ${getAllWingsShortLabel(config, "en")} - Cooperation • Discipline • Devotion ॥`);
   const historyText = language === "mr" ? (info.historyMr || "") : (info.historyEn || info.historyMr || "");
   const pillarsList = info.pillars || [];
   const committeeList = info.committeeMembers || [];
@@ -106,10 +109,10 @@ const AboutMandal = () => {
                   <span>{helpline}</span>
                 </div>
               )}
-              {config?.participatingWings && config.participatingWings.length > 0 && (
+              {getWingCodesText(config) && (
                 <div className="flex items-center gap-2 text-gold-200">
                   <Building2 className="w-3.5 h-3.5 text-gold-400 flex-shrink-0" />
-                  <span>{language === "mr" ? "विंग्स:" : "Wings:"} {config.participatingWings.join(", ")}</span>
+                  <span>{language === "mr" ? "विंग्स:" : "Wings:"} {getWingCodesText(config, ", ")}</span>
                 </div>
               )}
             </div>

@@ -60,6 +60,19 @@ const DEFAULT_CONFIG = {
     prasadSpecial: "",
     specialNote: ""
   },
+  festivalScheduleCard: {
+    eventNameMr: "श्री गणेशोत्सव २०२६ (१० दिवसीय भव्य उत्सव)",
+    eventNameEn: "Shree Ganeshotsav 2026 (10-Day Grand Celebration)",
+    eventDescriptionMr: "म्हाडा टॉवर्स संकुलातील सर्व ४ विंग्ज (G, H, J, K) संयुक्त विद्यमाने आयोजित १० दिवसीय अखंड गणेशोत्सव सोहळा.",
+    eventDescriptionEn: "10-day grand festival celebration organized jointly by all 4 buildings (Wings G, H, J, K) of MHADA Towers.",
+    plannerMr: "म्हाडा टॉवर्स उत्सव मंडळ व मध्यवर्ती सोसायटी समिती",
+    plannerEn: "MHADA Towers Utsav Mandal & Central Society Committee",
+    plannerDetailsMr: "सर्व ४ इमारतींचे विंग प्रमुख व स्वयंसेवक दल (विंग G, H, J, K)",
+    plannerDetailsEn: "All 4 Building Wing Leads & Volunteer Squad (Wings G, H, J, K)",
+    imageUrl: "",
+    imageCaptionMr: "उत्सव वेळापत्रक व संपूर्ण कार्यक्रम रूपरेषा",
+    imageCaptionEn: "Festival Schedule & Complete Event Blueprint"
+  },
   wings: [],
   rules: [],
   gallery: [],
@@ -109,6 +122,26 @@ const DEFAULT_CONFIG = {
   }
 };
 
+const sanitizeField = (val, fallback) => {
+  if (typeof val === "string" && (val.includes("??") || val.includes("\ufffd"))) {
+    return fallback;
+  }
+  return val || fallback;
+};
+
+const cleanFestivalScheduleCard = (card) => {
+  if (!card) return DEFAULT_CONFIG.festivalScheduleCard;
+  return {
+    ...DEFAULT_CONFIG.festivalScheduleCard,
+    ...card,
+    eventNameMr: sanitizeField(card.eventNameMr, DEFAULT_CONFIG.festivalScheduleCard.eventNameMr),
+    eventDescriptionMr: sanitizeField(card.eventDescriptionMr, DEFAULT_CONFIG.festivalScheduleCard.eventDescriptionMr),
+    plannerMr: sanitizeField(card.plannerMr, DEFAULT_CONFIG.festivalScheduleCard.plannerMr),
+    plannerDetailsMr: sanitizeField(card.plannerDetailsMr, DEFAULT_CONFIG.festivalScheduleCard.plannerDetailsMr),
+    imageCaptionMr: sanitizeField(card.imageCaptionMr, DEFAULT_CONFIG.festivalScheduleCard.imageCaptionMr)
+  };
+};
+
 export const ConfigProvider = ({ children }) => {
   const [config, setConfig] = useState(() => {
     try {
@@ -121,7 +154,12 @@ export const ConfigProvider = ({ children }) => {
           if (!parsed.mandalInfo) parsed.mandalInfo = {};
           parsed.mandalInfo.committeeMembers = DEFAULT_CONFIG.mandalInfo.committeeMembers;
         }
-        return { ...DEFAULT_CONFIG, ...parsed };
+        const cleaned = {
+          ...DEFAULT_CONFIG,
+          ...parsed,
+          festivalScheduleCard: cleanFestivalScheduleCard(parsed.festivalScheduleCard)
+        };
+        return cleaned;
       }
     } catch (e) {
       console.error(e);
@@ -140,6 +178,7 @@ export const ConfigProvider = ({ children }) => {
           ...serverConfig,
           tabs: { ...DEFAULT_CONFIG.tabs, ...(serverConfig.tabs || {}) },
           sidebarSettings: { ...DEFAULT_CONFIG.sidebarSettings, ...(serverConfig.sidebarSettings || {}) },
+          festivalScheduleCard: cleanFestivalScheduleCard(serverConfig.festivalScheduleCard),
           mandalInfo: {
             ...DEFAULT_CONFIG.mandalInfo,
             ...(serverConfig.mandalInfo || {}),
@@ -389,6 +428,31 @@ export const ConfigProvider = ({ children }) => {
     }
   };
 
+  const updateFestivalScheduleCard = async (festivalScheduleCard) => {
+    try {
+      const res = await API.put("/config/festival-schedule-card", { festivalScheduleCard });
+      if (res.data.success) {
+        const updated = {
+          ...config,
+          festivalScheduleCard: res.data.festivalScheduleCard || festivalScheduleCard
+        };
+        saveLocal(updated);
+        return { success: true };
+      }
+      return { success: false, message: res.data.message };
+    } catch (err) {
+      const updated = {
+        ...config,
+        festivalScheduleCard: {
+          ...(config.festivalScheduleCard || {}),
+          ...festivalScheduleCard
+        }
+      };
+      saveLocal(updated);
+      return { success: true, message: "स्थानिकरित्या जतन झाले" };
+    }
+  };
+
   return (
     <ConfigContext.Provider
       value={{
@@ -406,7 +470,8 @@ export const ConfigProvider = ({ children }) => {
         updateVolunteerSeva,
         updateSidebar,
         updateAartiSchedule,
-        updateMandalInfo
+        updateMandalInfo,
+        updateFestivalScheduleCard
       }}
     >
       {children}

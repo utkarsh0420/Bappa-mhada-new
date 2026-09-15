@@ -144,14 +144,14 @@ const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
       {/* 5. Main Content Sections */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-8">
         
+        {/* RANK #1 FEATURED: 10-DAY FESTIVAL SCHEDULE & EVENT BLUEPRINT */}
+        {config?.tabs?.schedule?.enabled !== false && (
+          <TenDaysSchedule />
+        )}
+
         {/* DAILY MAHA AARTI & LIVE COUNTDOWN */}
         {config?.tabs?.aarti?.enabled !== false && (
           <AartiCard />
-        )}
-
-        {/* 10-DAY FESTIVAL SCHEDULE */}
-        {config?.tabs?.schedule?.enabled !== false && (
-          <TenDaysSchedule />
         )}
 
         {/* MAHAPRASAD CARD (If prasad tab is enabled) */}

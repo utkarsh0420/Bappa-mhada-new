@@ -60,6 +60,18 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Serve production client build if exists with SPA fallback
+const clientDistDir = path.join(__dirname, "../client/dist");
+if (fs.existsSync(clientDistDir)) {
+  app.use(express.static(clientDistDir));
+  app.get("*", (req, res) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      return res.status(404).json({ success: false, message: "API endpoint not found" });
+    }
+    res.sendFile(path.join(clientDistDir, "index.html"));
+  });
+}
+
 // Start Server and Database Connection
 const startServer = async () => {
   const isConnected = await connectDB();

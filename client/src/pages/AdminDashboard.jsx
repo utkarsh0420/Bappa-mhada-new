@@ -41,7 +41,8 @@ const AdminDashboard = ({ onClose }) => {
     updateGallery,
     updatePoll,
     updateVolunteerSeva,
-    updateMandalInfo
+    updateMandalInfo,
+    updateFestivalScheduleCard
   } = useConfig();
   const { admin, logout } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
@@ -139,7 +140,7 @@ const AdminDashboard = ({ onClose }) => {
     { id: "broadcast", label: language === "mr" ? "व्हॉट्सॲप ब्रॉडकास्ट" : "WhatsApp Broadcast", sublabel: language === "mr" ? "Broadcast" : "ब्रॉडकास्ट", icon: MessageSquare, badge: language === "mr" ? "थेट शेअर" : "Direct Share" },
     { id: "newsletter", label: language === "mr" ? "दैनिक वृत्तपत्र" : "Daily Newsletter", sublabel: language === "mr" ? "Newsletter" : "वृत्तपत्र", icon: Newspaper },
     { id: "wings", label: language === "mr" ? "सहभागी इमारती" : "Participating Wings", sublabel: language === "mr" ? "Wings" : "विंग्स", icon: Building2, badge: config?.wings?.length || 4 },
-    { id: "aartiSchedule", label: language === "mr" ? "१० दिवस आरती वेळापत्रक" : "10-Day Aarti Schedule", sublabel: language === "mr" ? "Aarti Schedule" : "आरती", icon: Flame, badge: language === "mr" ? "१० दिवस" : "10 Days" },
+    { id: "aartiSchedule", label: language === "mr" ? "वेळापत्रक, फोटो व आरती" : "Festival Schedule & Photo", sublabel: language === "mr" ? "Schedule & Photo" : "वेळापत्रक व फोटो", icon: Flame, badge: language === "mr" ? "फोटो व नियोजन" : "Photo & Event" },
     { id: "announcements", label: language === "mr" ? "महत्वाच्या सूचना" : "Announcements", sublabel: language === "mr" ? "Announcements" : "सूचना", icon: Megaphone, badge: announcements.length },
     { id: "events", label: language === "mr" ? "कार्यक्रम" : "Events Schedule", sublabel: language === "mr" ? "Events" : "कार्यक्रम", icon: Calendar, badge: events.length },
     { id: "gallery", label: language === "mr" ? "फोटो गॅलरी" : "Photo Gallery", sublabel: language === "mr" ? "Gallery" : "गॅलरी", icon: ImageIcon, badge: config?.gallery?.length || 0 },
@@ -432,6 +433,7 @@ const AdminDashboard = ({ onClose }) => {
             <AartiScheduleManager
               config={config}
               onSaveAartiSchedule={updateAartiSchedule}
+              onSaveFestivalScheduleCard={updateFestivalScheduleCard}
               onNotify={notify}
             />
           )}

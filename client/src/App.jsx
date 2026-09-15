@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ConfigProvider, useConfig } from "./context/ConfigContext";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
@@ -9,7 +9,6 @@ import Home from "./pages/Home";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLoginModal from "./components/AdminLoginModal";
 import Sidebar from "./components/Sidebar";
-import AIBappaChatbot from "./components/AIBappaChatbot";
 import UpcomingEventsCalendarModal from "./components/UpcomingEventsCalendarModal";
 import { 
   ResidentPollsModal, 
@@ -23,8 +22,25 @@ const MainApp = () => {
   const { config, loading } = useConfig();
   const { language } = useLanguage();
 
-  const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
-  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
+  const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      const hasToken = Boolean(localStorage.getItem("mhada_admin_token"));
+      return (path === "/admin" || path === "/admin/" || hash === "#admin") && hasToken;
+    }
+    return false;
+  });
+
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      const hasToken = Boolean(localStorage.getItem("mhada_admin_token"));
+      return (path === "/admin" || path === "/admin/" || hash === "#admin") && !hasToken;
+    }
+    return false;
+  });
 
   // Upcoming & Yearly Events Calendar Modal State
   const [isUpcomingCalendarOpen, setIsUpcomingCalendarOpen] = useState(false);
@@ -36,6 +52,58 @@ const MainApp = () => {
   const [isVolunteerOpen, setIsVolunteerOpen] = useState(false);
   const [isWingsOpen, setIsWingsOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
+  // Sync state with browser URL on popstate (Back/Forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      const hasToken = Boolean(localStorage.getItem("mhada_admin_token"));
+
+      if (path === "/admin" || path === "/admin/" || hash === "#admin") {
+        if (hasToken) {
+          setIsAdminDashboardOpen(true);
+          setIsAdminLoginModalOpen(false);
+        } else {
+          setIsAdminDashboardOpen(false);
+          setIsAdminLoginModalOpen(true);
+        }
+      } else {
+        setIsAdminDashboardOpen(false);
+        setIsAdminLoginModalOpen(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Handle section hash on initial load (e.g. #schedule, #aarti)
+  useEffect(() => {
+    const hash = window.location.hash.toLowerCase();
+    if (hash && hash !== "#admin" && hash.length > 1) {
+      const targetId = hash.replace("#", "");
+      setTimeout(() => {
+        const el = document.getElementById(targetId) || document.getElementById(`${targetId}-section`);
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }, 350);
+    }
+  }, []);
+
+  const handleOpenAdminDashboard = () => {
+    setIsAdminDashboardOpen(true);
+    setIsAdminLoginModalOpen(false);
+    if (window.location.pathname !== "/admin") {
+      window.history.pushState({ page: "admin" }, "", "/admin");
+    }
+  };
+
+  const handleCloseAdminDashboard = () => {
+    setIsAdminDashboardOpen(false);
+    if (window.location.pathname === "/admin") {
+      window.history.pushState({ page: "home" }, "", "/");
+    }
+  };
 
   const handleOpenUpcomingCalendar = (tab = "festival") => {
     setUpcomingCalendarTab(tab);
@@ -64,13 +132,18 @@ const MainApp = () => {
   if (isAdminDashboardOpen && admin) {
     return (
       <AdminDashboard
-        onClose={() => setIsAdminDashboardOpen(false)}
+        onClose={handleCloseAdminDashboard}
       />
     );
   }
 
   const handleSidebarAction = (itemId, targetSection) => {
-    if (itemId === "schedule") {
+    if (itemId === "schedule" || targetSection === "schedule") {
+      const el = document.getElementById("schedule") || document.getElementById("schedule-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+        return;
+      }
       handleOpenUpcomingCalendar("10days");
       return;
     }
@@ -95,7 +168,7 @@ const MainApp = () => {
       return;
     }
     if (itemId === "adminLogin") {
-      if (admin) setIsAdminDashboardOpen(true);
+      if (admin) handleOpenAdminDashboard();
       else setIsAdminLoginModalOpen(true);
       return;
     }
@@ -106,15 +179,15 @@ const MainApp = () => {
     else if (targetSection === "marquee") elementId = "marquee-section";
     else if (targetSection === "announcements") elementId = "marquee-section";
     else if (targetSection === "events") elementId = "events-section";
-    else if (targetSection === "aarti") elementId = "aarti-section";
-    else if (targetSection === "schedule") elementId = "schedule-section";
+    else if (targetSection === "aarti") elementId = "aarti";
+    else if (targetSection === "schedule") elementId = "schedule";
     else if (targetSection === "upcoming") elementId = "upcoming-section";
     else if (targetSection === "gallery") elementId = "gallery-section";
     else if (targetSection === "contacts") elementId = "contacts-section";
     else if (targetSection === "mandal-info") elementId = "mandal-info-section";
 
     if (elementId) {
-      const el = document.getElementById(elementId);
+      const el = document.getElementById(elementId) || document.getElementById(`${elementId}-section`) || document.getElementById(elementId.replace("-section", ""));
       if (el) {
         el.scrollIntoView({ behavior: "smooth" });
       } else if (targetSection === "top") {
@@ -132,14 +205,14 @@ const MainApp = () => {
         onClose={() => setIsSidebarOpen(false)}
         onSelectAction={handleSidebarAction}
         onOpenAdminLogin={() => setIsAdminLoginModalOpen(true)}
-        onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
+        onOpenAdminDashboard={handleOpenAdminDashboard}
       />
 
       {/* Top Header with Logo, Navigation Links, Society Email, Language Switcher, and Admin Access */}
       <Header
         onOpenSidebar={() => setIsSidebarOpen(true)}
         onOpenAdminLogin={() => setIsAdminLoginModalOpen(true)}
-        onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
+        onOpenAdminDashboard={handleOpenAdminDashboard}
         onOpenUpcomingCalendar={handleOpenUpcomingCalendar}
       />
 
@@ -154,21 +227,24 @@ const MainApp = () => {
       {/* Official Footer with 4 Building Names & Society Email */}
       <Footer
         onOpenAdminLogin={() => {
-          if (admin) setIsAdminDashboardOpen(true);
+          if (admin) handleOpenAdminDashboard();
           else setIsAdminLoginModalOpen(true);
         }}
       />
 
-      {/* + ADDED: AI BAPPA CHATBOT FLOATING WIDGET (Image 2 Requirement) */}
-      <AIBappaChatbot />
 
       {/* Admin Login Modal */}
       <AdminLoginModal
         isOpen={isAdminLoginModalOpen}
-        onClose={() => setIsAdminLoginModalOpen(false)}
+        onClose={() => {
+          setIsAdminLoginModalOpen(false);
+          if (window.location.pathname === "/admin") {
+            window.history.pushState({ page: "home" }, "", "/");
+          }
+        }}
         onSuccess={() => {
           setIsAdminLoginModalOpen(false);
-          setIsAdminDashboardOpen(true);
+          handleOpenAdminDashboard();
         }}
       />
 

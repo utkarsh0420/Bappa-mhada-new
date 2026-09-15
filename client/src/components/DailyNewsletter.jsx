@@ -7,6 +7,7 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useConfig } from "../context/ConfigContext";
 import { openWhatsApp, formatNewsletterBroadcast, copyToClipboard } from "../utils/whatsappFormatter";
+import { getWingsCount, getAllWingsLabel } from "../utils/wingUtils";
 
 const DailyNewsletter = ({ onOpenUpcomingCalendar }) => {
   const { language, t } = useLanguage();
@@ -38,6 +39,8 @@ const DailyNewsletter = ({ onOpenUpcomingCalendar }) => {
   const dayNum = activeDay.dayNumber || (selectedDayIdx + 1);
 
   const nl = config?.newsletter || {};
+  const wingsCount = getWingsCount(config);
+  const allWingsLabel = getAllWingsLabel(config, language);
 
   const edition = language === "mr" 
     ? (nl.edition || `दैनिक डिजिटल उत्सव बुलेटिन • दिवस ${dayNum}`)
@@ -52,12 +55,12 @@ const DailyNewsletter = ({ onOpenUpcomingCalendar }) => {
     : (nl.headlineEn || nl.headline || activeDay.tithiEn || activeDay.tithi || "Daily Mahapooja & Maha Aarti");
 
   const summary = language === "mr" 
-    ? (nl.subheadline || activeDay.morningRitual || nl.specialNote || "सर्व ४ विंग्समधील रहिवाशांचे श्री गणेशोत्सवात हार्दिक स्वागत!")
-    : (nl.subheadlineEn || nl.subheadline || activeDay.morningRitualEn || activeDay.morningRitual || "Warm welcome to all residents across all 4 society buildings!");
+    ? (nl.subheadline || activeDay.morningRitual || nl.specialNote || `सर्व ${wingsCount} विंग्समधील रहिवाशांचे श्री गणेशोत्सवात हार्दिक स्वागत!`)
+    : (nl.subheadlineEn || nl.subheadline || activeDay.morningRitualEn || activeDay.morningRitual || `Warm welcome to all residents across all ${wingsCount} society buildings!`);
 
   const hostWing = language === "mr" 
-    ? (activeDay.hostWing || nl.todaysHostWing || "सर्व ४ विंग्ज (G, H, J, K)")
-    : (activeDay.hostWingEn || activeDay.hostWing || nl.todaysHostWing || "All 4 Wings (G, H, J, K)");
+    ? (activeDay.hostWing || nl.todaysHostWing || allWingsLabel)
+    : (activeDay.hostWingEn || activeDay.hostWing || nl.todaysHostWing || allWingsLabel);
 
   const hostLead = language === "mr"
     ? (activeDay.hostLead || nl.hostLead || "")

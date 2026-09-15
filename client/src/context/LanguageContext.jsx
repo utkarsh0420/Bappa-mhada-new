@@ -43,9 +43,18 @@ export const translations = {
     hostRepresentative: "यजमान प्रमुख",
     shareTimings: "आरती वेळ व्हॉट्सॲपवर पाठवा",
 
-    // 10-Day Schedule
-    scheduleTitle: "१० दिवसांचे सविस्तर वेळापत्रक",
-    scheduleSubtitle: "गणेश चतुर्थी ते अनंत चतुर्दशी दैनिक तारीखनिहाय कार्यक्रम व पूजा",
+    // 10-Day Schedule & Festival Card
+    scheduleTitle: "उत्सव रूपरेषा व वेळापत्रक",
+    scheduleSubtitle: "अधिकृत उत्सव कार्यक्रम, वेळापत्रक फोटो व नियोजन माहिती",
+    festivalEventTitle: "उत्सव रूपरेषा व वेळापत्रक फोटो",
+    festivalEventSubtitle: "अधिकृत उत्सव कार्यक्रम, वेळापत्रक फोटो व नियोजन माहिती",
+    whatIsEvent: "काय कार्यक्रम आहे (Event Details)",
+    eventPlanner: "उत्सव नियोजन व संयोजन (Event Planner)",
+    viewSchedulePhoto: "वेळापत्रक फोटो पहा",
+    openPhotoModal: "फोटो उघडा (View Full Photo)",
+    noPhotoAvailable: "वेळापत्रक फोटो अद्याप अपलोड केलेला नाही. लवकरच उपलब्ध होईल.",
+    clickToEnlarge: "मोठा फोटो पाहण्यासाठी क्लिक करा",
+    singleCloseBtn: "बंद करा (Close)",
     day: "दिवस",
     date: "तारीख",
     specialRitual: "विशेष विधी व पूजा",
@@ -70,22 +79,7 @@ export const translations = {
     emailUs: "ईमेल पाठवा",
     copied: "कॉपी केले!",
     copyEmail: "ईमेल कॉपी करा",
-    callNow: "कॉल करा",
-
-    // AI Bappa Chatbot
-    bappaAssistant: "AI बाप्पा सहाय्यक",
-    bappaOnline: "सदा सेवेत तत्पर • आशीर्वाद",
-    askBappa: "बाप्पांना कोणताही प्रश्न विचारा...",
-    send: "पाठवा",
-    bappaWelcome: "नमस्कार! मी म्हाडा टॉवर्स गणेशोत्सवाचा डिजिटल सहाय्यक आहे. मी आपल्याला आरतीच्या वेळा, १० दिवसांचे वेळापत्रक, विंग यजमान, संपर्क किंवा बाप्पांचे आशीर्वाद याबद्दल माहिती देऊ शकतो!",
-    quickPrompts: [
-      "🪔 आजची महाआरती वेळ काय?",
-      "🏢 आजचा विंग यजमान कोण?",
-      "📅 १० दिवसांचे वेळापत्रक दाखवा",
-      "📧 सोसायटी अधिकृत ईमेल काय?",
-      "📞 तातडीचा मदत संपर्क?",
-      "🌸 बाप्पांचे आशीर्वाद व श्लोक"
-    ]
+    callNow: "कॉल करा"
   },
   en: {
     // Navigation & Header
@@ -127,9 +121,18 @@ export const translations = {
     hostRepresentative: "Host Coordinator",
     shareTimings: "Share Timings on WhatsApp",
 
-    // 10-Day Schedule
-    scheduleTitle: "10-Day Date-Wise Schedule",
-    scheduleSubtitle: "Daily events and rituals from Ganesh Chaturthi to Anant Chaturdashi",
+    // 10-Day Schedule & Festival Card
+    scheduleTitle: "Festival Blueprint & Schedule",
+    scheduleSubtitle: "Official festival events, schedule photo flyer and organizer planners",
+    festivalEventTitle: "Festival Blueprint & Schedule Photo",
+    festivalEventSubtitle: "Official festival events, schedule photo flyer and organizer planners",
+    whatIsEvent: "What the Event is",
+    eventPlanner: "Event Planner & Organizers",
+    viewSchedulePhoto: "View Schedule Photo",
+    openPhotoModal: "View Full Photo",
+    noPhotoAvailable: "Festival schedule photo is not uploaded yet. Will be available soon.",
+    clickToEnlarge: "Click to open full photo",
+    singleCloseBtn: "Close",
     day: "Day",
     date: "Date",
     specialRitual: "Rituals & Pooja",
@@ -154,22 +157,7 @@ export const translations = {
     emailUs: "Send Email",
     copied: "Copied!",
     copyEmail: "Copy Email",
-    callNow: "Call Now",
-
-    // AI Bappa Chatbot
-    bappaAssistant: "AI Bappa Assistant",
-    bappaOnline: "Always at your service • Divine Blessings",
-    askBappa: "Ask Bappa anything about the festival...",
-    send: "Send",
-    bappaWelcome: "Namaskar! I am your MHADA Towers Ganesh Festival AI Assistant. I can help you with Aarti timings, 10-day schedule, host wings, contacts, or divine blessings!",
-    quickPrompts: [
-      "🪔 What is today's Aarti time?",
-      "🏢 Which wing is today's host?",
-      "📅 Show 10-Day Schedule",
-      "📧 What is the Society Email?",
-      "📞 Emergency Helpline numbers?",
-      "🌸 Bappa's Blessings & Shlokas"
-    ]
+    callNow: "Call Now"
   }
 };
 

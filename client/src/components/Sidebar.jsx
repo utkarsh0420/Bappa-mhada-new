@@ -7,6 +7,7 @@ import {
 import { useConfig } from "../context/ConfigContext";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { getAllWingsShortLabel, getWingCodesText } from "../utils/wingUtils";
 
 const ICON_MAP = {
   LayoutDashboard,
@@ -188,8 +189,8 @@ const Sidebar = ({
             </p>
             <p className="text-[10px] text-gray-600 mt-0.5">
               {language === "mr" 
-                ? (settings.bottomCardTagline || "॥ ४ विंग्स, एकच परिवार - सहकार्य • शिस्त • अखंड भक्ती ॥")
-                : "॥ 4 Wings, One Family - Cooperation • Discipline • Devotion ॥"}
+                ? (settings.bottomCardTagline || `॥ ${getAllWingsShortLabel(config, "mr")} - सहकार्य • शिस्त • अखंड भक्ती ॥`)
+                : (settings.bottomCardTagline || `॥ ${getAllWingsShortLabel(config, "en")} - Cooperation • Discipline • Devotion ॥`)}
             </p>
           </div>
         </div>
