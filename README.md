@@ -1,0 +1,75 @@
+# म्हाडा टॉवर्स उत्सव मंडळ (MHADA Towers Utsav Mandal)
+### श्री गणेशोत्सव डिजिटल माहिती केंद्र व कार्यक्रम पत्रिका (Ganpati Digital Information Hub)
+**पिंपरी वाघेरे, पिंपरी चिंचवड, पुणे - ४११०१७ | नोंदणी क्र: १२४३/२०२५ - पुणे**
+
+---
+
+## 🌟 वैशिष्ट्ये (Key Features)
+
+1. **लोगो व राजेशाही रंगसंगती (Logo & Aesthetic Alignment)**
+   - अधिकृत मंडळ लोगो (`logo.jpg`) कोणत्याही त्रुटीशिवाय (zero glitch/error) समाविष्ट.
+   - लोगोमधून घेतलेले शाही रंग:
+     - **शाही मरून / वाईन रेड (`#5B0914`, `#780C1E`)**
+     - **सोनेरी रंग / इम्पीरियल गोल्ड (`#D4AF37`, `#F3C644`)**
+     - **भगवा / झेंडू नारंगी (`#EA580C`)**
+     - **उबदार पांढरा / क्रीम (`#FFFDF9`, `#FAF5EC`)**
+   - कोणतेही अनावश्यक किंवा भडक रंग टाळून पवित्र व मंगलमय डिझाइन.
+
+2. **सार्वजनिक डिजिटल वृत्तपत्र व कार्यक्रम स्क्रोलर (Public Digital Newsletter)**
+   - **सर्व भाविकांसाठी खुला**: लॉगिन किंवा खात्याची कोणतीही गरज नाही.
+   - **ब्रेकिंग न्यूज स्क्रोलर टिकर**: वेबसाईटच्या सर्वात वर तातडीच्या सूचना व आरती वेळा थेट धावतात.
+   - **इव्हेंट स्क्रोलर (Event Scroller)**:
+     - 🚩 **श्रींचे आगमन (Ganpati Arrival)**
+     - 🪔 **दैनिक महाआरती वेळा (Morning & Evening Aarti Timings)**
+     - 🍲 **५व्या दिवसाचा महाप्रसाद (Maha Prasad Feast & Menu)**
+     - 🎭 **सांस्कृतिक कार्यक्रम व स्पर्धा (Cultural Events)**
+     - 🌺 **विसर्जन मिरवणूक व कृत्रिम हौद (Visarjan Procession)**
+     - 📢 **महत्वाच्या सूचना व व्हॉट्सॲप शेअर बटण**
+   - **५ सहभागी इमारती फिल्टर**: [ G, H, I, J, K ] विंग्समधील रहिवाशांसाठी विशेष माहिती फिल्टर.
+
+3. **व्हॉट्सॲप कम्युनिटी QR कोड (WhatsApp Group System)**
+   - हस्तलिखित टिपणानुसार: *"System: QR Code -> Private WhatsApp Community / Group"*
+   - रहिवाशांना दररोज स्वतंत्र मेसेज पाठवण्याचा त्रास कमी करण्यासाठी अधिकृत QR कोड व वन-टॅप जॉईन बटण.
+
+4. **व्यवस्थापक नियंत्रण कक्ष व टॅब मान्यता (Admin Portal & Tab Approvals)**
+   - **प्रवेशद्वार**: मुख्य वेबसाईटच्या **वरच्या उजव्या कोपऱ्यात (Top Right Corner)** discrete "व्यवस्थापक लॉगिन" बटण.
+   - **Google Sign-In / सोसायटी ईमेल**: Google द्वारे किंवा अधिकृत सोसायटी ईमेलने सुरक्षित लॉगिन.
+   - **संपूर्ण वेबसाईटवर ताबा व टॅब मान्यता (Overall Website Access & Tab Approvals)**:
+     - व्यवस्थापक प्रत्येक टॅब सुरू (Approve/Publish) किंवा बंद (Hide) करू शकतो.
+     - सूचना, आरती वेळा, सांस्कृतिक कार्यक्रम आणि संपर्क क्रमांकांचे थेट संपादन (CRUD).
+     - स्क्रोलर टिकरचा मजकूर बदलण्याची थेट सोय.
+
+---
+
+## 🔐 व्यवस्थापक लॉगिन माहिती (Admin Credentials)
+
+- **सोसायटी अधिकृत ईमेल**: `mhadatowersutsavmandal@gmail.com`
+- **पासवर्ड**: `MhadaGanpati@2025`
+- **Google लॉगिन**: "Sign in with Google (Society Email)" बटणावर क्लिक करून थेट अधिकृत प्रवेश.
+
+---
+
+## 🚀 प्रकल्प चालवण्याच्या सूचना (Running the Project)
+
+### १. बॅकएंड सर्व्हर सुरू करा (Backend Server)
+```bash
+cd server
+npm start
+# Server listens on http://localhost:5000
+# Database: MongoDB on mongodb://127.0.0.1:27017/mhada_utsav_db
+```
+
+### २. क्लायंट वेबसाईट सुरू करा (Client Frontend)
+```bash
+cd client
+npm run dev
+# Website opens on http://localhost:5173
+```
+
+---
+
+## 📱 तंत्रज्ञान (Tech Stack - MERN)
+- **MongoDB**: TabConfig, Announcements, Events, Contacts, Users
+- **Express.js**: RESTful APIs & JWT Auth
+- **React 18 / 19**: Vite, Tailwind CSS, Lucide Icons, QRCode.react
+- **Node.js**: v20+
