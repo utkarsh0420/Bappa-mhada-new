@@ -45,7 +45,6 @@
 
 - **सोसायटी अधिकृत ईमेल**: `mhadatowersutsavmandal@gmail.com`
 - **पासवर्ड**: `mhada@hig`
-- **Google लॉगिन**: "Sign in with Google (Society Email)" बटणावर क्लिक करून थेट अधिकृत प्रवेश.
 
 ---
 
