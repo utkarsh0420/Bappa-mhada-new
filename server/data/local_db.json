@@ -182,10 +182,7 @@
       },
       "volunteer": {
         "enabled": true,
-        "approved": true,
-        "labelMr": "सहभाग व सेवा",
-        "labelEn": "Volunteer Seva",
-        "order": 16
+        "approved": true
       },
       "mandalInfo": {
         "enabled": true,
@@ -195,7 +192,140 @@
         "order": 17
       }
     },
-    "sidebarMenu": [],
+    "sidebarMenu": [
+      {
+        "id": "dashboard",
+        "labelMr": "मुख्य पृष्ठ",
+        "labelEn": "Dashboard",
+        "badge": "",
+        "badgeType": "active",
+        "enabled": true,
+        "order": 1,
+        "targetSection": "top",
+        "icon": "LayoutDashboard"
+      },
+      {
+        "id": "liveUpdates",
+        "labelMr": "दैनिक वृत्तपत्र",
+        "labelEn": "Daily Bulletin",
+        "badge": "LIVE",
+        "badgeType": "pill-red",
+        "enabled": true,
+        "order": 2,
+        "targetSection": "marquee",
+        "icon": "Sparkles"
+      },
+      {
+        "id": "aartiSchedule",
+        "labelMr": "दैनिक महाआरती",
+        "labelEn": "Daily Maha Aarti",
+        "badge": "आरती",
+        "badgeType": "badge-gold",
+        "enabled": true,
+        "order": 3,
+        "targetSection": "aarti",
+        "icon": "Flame"
+      },
+      {
+        "id": "schedule",
+        "labelMr": "१० दिवसांचे वेळापत्रक",
+        "labelEn": "10-Day Schedule",
+        "badge": "१० दिवस",
+        "badgeType": "badge-gold",
+        "enabled": true,
+        "order": 4,
+        "targetSection": "schedule",
+        "icon": "Calendar"
+      },
+      {
+        "id": "upcoming",
+        "labelMr": "आगामी कार्यक्रम",
+        "labelEn": "Upcoming Events",
+        "badge": "नवीन",
+        "badgeType": "badge-gold",
+        "enabled": true,
+        "order": 5,
+        "targetSection": "upcoming",
+        "icon": "Calendar"
+      },
+      {
+        "id": "wings",
+        "labelMr": "इमारती (४ विंग्ज)",
+        "labelEn": "4 Buildings",
+        "badge": "",
+        "badgeType": "default",
+        "enabled": true,
+        "order": 6,
+        "targetSection": "wings",
+        "icon": "Building2"
+      },
+      {
+        "id": "polls",
+        "labelMr": "मतदान कट्टा",
+        "labelEn": "Resident Polls",
+        "badge": "",
+        "badgeType": "default",
+        "enabled": true,
+        "order": 7,
+        "targetSection": "polls",
+        "icon": "BarChart2"
+      },
+      {
+        "id": "volunteer",
+        "labelMr": "सहभाग व सेवा",
+        "labelEn": "Volunteer Seva",
+        "badge": "",
+        "badgeType": "default",
+        "enabled": true,
+        "order": 8,
+        "targetSection": "volunteer",
+        "icon": "Users"
+      },
+      {
+        "id": "gallery",
+        "labelMr": "छायाचित्रे",
+        "labelEn": "Photo Gallery",
+        "badge": "",
+        "badgeType": "default",
+        "enabled": true,
+        "order": 9,
+        "targetSection": "gallery",
+        "icon": "Image"
+      },
+      {
+        "id": "contacts",
+        "labelMr": "संपर्क व ईमेल",
+        "labelEn": "Helplines & Email",
+        "badge": "",
+        "badgeType": "default",
+        "enabled": true,
+        "order": 10,
+        "targetSection": "contacts",
+        "icon": "PhoneCall"
+      },
+      {
+        "id": "mandalInfo",
+        "labelMr": "मंडळ माहिती व सुरक्षा",
+        "labelEn": "Mandal Info & Security",
+        "badge": "",
+        "badgeType": "default",
+        "enabled": true,
+        "order": 11,
+        "targetSection": "mandal-info",
+        "icon": "Info"
+      },
+      {
+        "id": "adminLogin",
+        "labelMr": "व्यवस्थापक कक्ष",
+        "labelEn": "Admin Portal",
+        "badge": "",
+        "badgeType": "default",
+        "enabled": true,
+        "order": 12,
+        "targetSection": "admin-login",
+        "icon": "Shield"
+      }
+    ],
     "sidebarSettings": {
       "showFloatingTrigger": true,
       "bottomCardTitle": "All 4 Wings",
@@ -616,7 +746,7 @@
       "regDetails": "F ६३३६८ - पुणे",
       "mottoMr": "5 विंग्स, एकच परिवार (सहकार्य • शिस्त • अखंड भक्ती)",
       "officeAddressMr": "पिंपरी वाघेरे, पिंपरी चिंचवड, पुणे - ४११०१७",
-      "helpline": "",
+      "helpline": "+",
       "email": "mhadatowersutsavmandal@gmail.com",
       "bankDetails": {
         "accountName": "MHADA TOWERS GANESHOTSAV MANDAL",
@@ -717,7 +847,7 @@
         }
       ]
     },
-    "updatedAt": "2026-09-16T14:24:05.840Z",
+    "updatedAt": "2026-09-16T19:34:45.907Z",
     "festivalScheduleCard": {
       "eventNameMr": "श्री गणेशोत्सव २०२६ (१० दिवसीय भव्य उत्सव)",
       "eventNameEn": "Shree Ganeshotsav 2026 (10-Day Grand Celebration)",
@@ -1022,9 +1152,30 @@
       "createdAt": "2026-09-14T14:31:23.333Z"
     }
   ],
-  "receipts": [],
+  "receipts": [
+    {
+      "_id": "rcpt_1789578699211",
+      "receiptNo": "MT/2026/00001",
+      "residentName": "Ram",
+      "flatNo": "G- 502",
+      "building": "Wing G - नंदादेवी",
+      "purpose": "श्री गणेशोत्सव वर्गणी (Ganesh Utsav Contribution)",
+      "amount": 1001,
+      "amountInWords": "One Thousand One Rupees Only",
+      "paymentDate": "2026-09-16",
+      "paymentMode": "UPI",
+      "transactionRef": "",
+      "description": "Received with sincere thanks from the resident towards thanking for your contribution for MHADA Towers Utsav Mandal.",
+      "notes": "",
+      "sachivSignatureUrl": "",
+      "createdBy": "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
+      "createdAt": "2026-09-16T17:11:39.211Z",
+      "updatedAt": "2026-09-16T17:11:39.211Z"
+    }
+  ],
   "receiptSettings": {
     "sachivSignatureUrl": "",
     "receiptPrefix": "MT"
-  }
+  },
+  "volunteers": []
 }

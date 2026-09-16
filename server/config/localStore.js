@@ -100,7 +100,20 @@ const defaultInitialData = {
       volunteer: { enabled: true, approved: true, labelMr: "सहभाग व सेवा", labelEn: "Volunteer Seva", order: 16 },
       mandalInfo: { enabled: true, approved: true, labelMr: "मंडळ माहिती व सुरक्षा", labelEn: "Mandal Info", order: 17 }
     },
-    sidebarMenu: [],
+    sidebarMenu: [
+      { id: "dashboard", labelMr: "मुख्य पृष्ठ", labelEn: "Dashboard", badge: "", badgeType: "active", enabled: true, order: 1, targetSection: "top", icon: "LayoutDashboard" },
+      { id: "liveUpdates", labelMr: "दैनिक वृत्तपत्र", labelEn: "Daily Bulletin", badge: "LIVE", badgeType: "pill-red", enabled: true, order: 2, targetSection: "marquee", icon: "Sparkles" },
+      { id: "aartiSchedule", labelMr: "दैनिक महाआरती", labelEn: "Daily Maha Aarti", badge: "आरती", badgeType: "badge-gold", enabled: true, order: 3, targetSection: "aarti", icon: "Flame" },
+      { id: "schedule", labelMr: "१० दिवसांचे वेळापत्रक", labelEn: "10-Day Schedule", badge: "१० दिवस", badgeType: "badge-gold", enabled: true, order: 4, targetSection: "schedule", icon: "Calendar" },
+      { id: "upcoming", labelMr: "आगामी कार्यक्रम", labelEn: "Upcoming Events", badge: "नवीन", badgeType: "badge-gold", enabled: true, order: 5, targetSection: "upcoming", icon: "Calendar" },
+      { id: "wings", labelMr: "इमारती (४ विंग्ज)", labelEn: "4 Buildings", badge: "", badgeType: "default", enabled: true, order: 6, targetSection: "wings", icon: "Building2" },
+      { id: "polls", labelMr: "मतदान कट्टा", labelEn: "Resident Polls", badge: "", badgeType: "default", enabled: true, order: 7, targetSection: "polls", icon: "BarChart2" },
+      { id: "volunteer", labelMr: "सहभाग व सेवा", labelEn: "Volunteer Seva", badge: "", badgeType: "default", enabled: true, order: 8, targetSection: "volunteer", icon: "Users" },
+      { id: "gallery", labelMr: "छायाचित्रे", labelEn: "Photo Gallery", badge: "", badgeType: "default", enabled: true, order: 9, targetSection: "gallery", icon: "Image" },
+      { id: "contacts", labelMr: "संपर्क व ईमेल", labelEn: "Helplines & Email", badge: "", badgeType: "default", enabled: true, order: 10, targetSection: "contacts", icon: "PhoneCall" },
+      { id: "mandalInfo", labelMr: "मंडळ माहिती व सुरक्षा", labelEn: "Mandal Info & Security", badge: "", badgeType: "default", enabled: true, order: 11, targetSection: "mandal-info", icon: "Info" },
+      { id: "adminLogin", labelMr: "व्यवस्थापक कक्ष", labelEn: "Admin Portal", badge: "", badgeType: "default", enabled: true, order: 12, targetSection: "admin-login", icon: "Shield" }
+    ],
     sidebarSettings: {
       showFloatingTrigger: true,
       bottomCardTitle: "All 4 Buildings",
@@ -373,7 +386,8 @@ const defaultInitialData = {
   receiptSettings: {
     sachivSignatureUrl: "",
     receiptPrefix: "MT"
-  }
+  },
+  volunteers: []
 };
 
 class LocalStore {
@@ -409,6 +423,15 @@ class LocalStore {
             sachivSignatureUrl: "",
             receiptPrefix: "MT"
           };
+          this.save();
+        }
+        if (!Array.isArray(this.data.volunteers)) {
+          this.data.volunteers = [];
+          this.save();
+        }
+        if (!Array.isArray(this.data.config?.sidebarMenu) || this.data.config.sidebarMenu.length === 0) {
+          if (!this.data.config) this.data.config = {};
+          this.data.config.sidebarMenu = defaultInitialData.config.sidebarMenu;
           this.save();
         }
         this.migrateGalleryIfNeeded();
@@ -885,6 +908,15 @@ class LocalStore {
   // Receipts & Settings
   getReceipts(filter = {}) {
     let list = [...(this.data.receipts || [])];
+    const includeArchived = filter.includeArchived === true || filter.includeArchived === "true";
+    if (!includeArchived && !filter.status) {
+      list = list.filter(r => !r.isArchived);
+    } else if (filter.status === "archived") {
+      list = list.filter(r => r.isArchived);
+    } else if (filter.status === "active") {
+      list = list.filter(r => !r.isArchived);
+    }
+
     if (filter.q) {
       const q = filter.q.toLowerCase().trim();
       list = list.filter(r => 
@@ -892,7 +924,9 @@ class LocalStore {
         (r.residentName && r.residentName.toLowerCase().includes(q)) ||
         (r.flatNo && r.flatNo.toLowerCase().includes(q)) ||
         (r.building && r.building.toLowerCase().includes(q)) ||
-        (r.purpose && r.purpose.toLowerCase().includes(q))
+        (r.purpose && r.purpose.toLowerCase().includes(q)) ||
+        (r.paymentDate && r.paymentDate.toLowerCase().includes(q)) ||
+        (r.paymentMode && r.paymentMode.toLowerCase().includes(q))
       );
     }
     return list.sort((a, b) => new Date(b.createdAt || b.paymentDate || 0) - new Date(a.createdAt || a.paymentDate || 0));
@@ -961,6 +995,9 @@ class LocalStore {
       notes: receiptData.notes?.trim() || "",
       sachivSignatureUrl: receiptData.sachivSignatureUrl || this.data.receiptSettings?.sachivSignatureUrl || "",
       createdBy: receiptData.createdBy || "Admin",
+      isArchived: false,
+      archivedAt: null,
+      archivedBy: "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -970,14 +1007,41 @@ class LocalStore {
     return receipt;
   }
 
+  archiveReceipt(id, adminName = "Admin") {
+    if (!id || !this.data?.receipts) return null;
+    const cleanId = String(id).trim();
+    const cleanNo = cleanId.toUpperCase();
+    const rcpt = this.data.receipts.find(
+      r => String(r._id) === cleanId || (r.receiptNo && r.receiptNo.toUpperCase() === cleanNo)
+    );
+    if (!rcpt) return null;
+    rcpt.isArchived = true;
+    rcpt.archivedAt = new Date().toISOString();
+    rcpt.archivedBy = adminName || "Admin";
+    rcpt.updatedAt = new Date().toISOString();
+    this.save();
+    return rcpt;
+  }
+
+  restoreReceipt(id) {
+    if (!id || !this.data?.receipts) return null;
+    const cleanId = String(id).trim();
+    const cleanNo = cleanId.toUpperCase();
+    const rcpt = this.data.receipts.find(
+      r => String(r._id) === cleanId || (r.receiptNo && r.receiptNo.toUpperCase() === cleanNo)
+    );
+    if (!rcpt) return null;
+    rcpt.isArchived = false;
+    rcpt.archivedAt = null;
+    rcpt.archivedBy = "";
+    rcpt.updatedAt = new Date().toISOString();
+    this.save();
+    return rcpt;
+  }
+
   deleteReceipt(id) {
-    const initialLen = this.data.receipts.length;
-    this.data.receipts = this.data.receipts.filter(r => String(r._id) !== String(id));
-    if (this.data.receipts.length !== initialLen) {
-      this.save();
-      return true;
-    }
-    return false;
+    // By default, soft-archive for safety
+    return this.archiveReceipt(id);
   }
 
   getReceiptSettings() {
@@ -995,6 +1059,114 @@ class LocalStore {
     };
     this.save();
     return this.data.receiptSettings;
+  }
+
+  // ==========================================
+  // Volunteer Management Methods
+  // ==========================================
+  getVolunteers(filter = {}) {
+    let list = Array.isArray(this.data?.volunteers) ? [...this.data.volunteers] : [];
+    const { search, status, wing, volunteerArea, emailStatus } = filter;
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        v =>
+          (v.fullName && v.fullName.toLowerCase().includes(q)) ||
+          (v.mobile && v.mobile.toLowerCase().includes(q)) ||
+          (v.email && v.email.toLowerCase().includes(q)) ||
+          (v.flatNo && v.flatNo.toLowerCase().includes(q)) ||
+          (v.message && v.message.toLowerCase().includes(q))
+      );
+    }
+
+    if (status && status !== "all") {
+      list = list.filter(v => v.status === status);
+    }
+
+    if (wing && wing !== "all") {
+      list = list.filter(v => v.wing && v.wing.toLowerCase().includes(wing.toLowerCase()));
+    }
+
+    if (volunteerArea && volunteerArea !== "all") {
+      list = list.filter(v => v.volunteerArea && v.volunteerArea.toLowerCase().includes(volunteerArea.toLowerCase()));
+    }
+
+    if (emailStatus && emailStatus !== "all") {
+      list = list.filter(v => v.emailStatus === emailStatus);
+    }
+
+    // Sort newest first
+    return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  getVolunteerById(id) {
+    if (!id || !Array.isArray(this.data?.volunteers)) return null;
+    return this.data.volunteers.find(v => String(v._id) === String(id)) || null;
+  }
+
+  createVolunteer(volunteerData) {
+    if (!Array.isArray(this.data.volunteers)) {
+      this.data.volunteers = [];
+    }
+
+    const volunteer = {
+      _id: "vol_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+      fullName: volunteerData.fullName?.trim() || "",
+      mobile: volunteerData.mobile?.trim() || "",
+      email: volunteerData.email?.trim()?.toLowerCase() || "",
+      wing: volunteerData.wing?.trim() || "",
+      flatNo: volunteerData.flatNo?.trim() || "",
+      volunteerArea: volunteerData.volunteerArea?.trim() || "",
+      availability: volunteerData.availability?.trim() || "",
+      preferredDates: volunteerData.preferredDates?.trim() || "",
+      message: volunteerData.message?.trim() || "",
+      status: "New",
+      emailStatus: "Not Sent",
+      emailSentAt: null,
+      emailRecipient: "",
+      emailSubject: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    this.data.volunteers.unshift(volunteer);
+    this.save();
+    return volunteer;
+  }
+
+  updateVolunteerStatus(id, status) {
+    if (!id || !Array.isArray(this.data?.volunteers)) return null;
+    const v = this.data.volunteers.find(item => String(item._id) === String(id));
+    if (!v) return null;
+    v.status = status;
+    v.updatedAt = new Date().toISOString();
+    this.save();
+    return v;
+  }
+
+  updateVolunteerEmail(id, { recipient, subject }) {
+    if (!id || !Array.isArray(this.data?.volunteers)) return null;
+    const v = this.data.volunteers.find(item => String(item._id) === String(id));
+    if (!v) return null;
+    v.emailStatus = "Sent";
+    v.emailSentAt = new Date().toISOString();
+    v.emailRecipient = recipient || v.email;
+    v.emailSubject = subject || "Thank You for Volunteering with MHADA Towers Utsav Mandal";
+    v.updatedAt = new Date().toISOString();
+    this.save();
+    return v;
+  }
+
+  deleteVolunteer(id) {
+    if (!id || !Array.isArray(this.data?.volunteers)) return false;
+    const initialLen = this.data.volunteers.length;
+    this.data.volunteers = this.data.volunteers.filter(item => String(item._id) !== String(id));
+    if (this.data.volunteers.length !== initialLen) {
+      this.save();
+      return true;
+    }
+    return false;
   }
 }
 

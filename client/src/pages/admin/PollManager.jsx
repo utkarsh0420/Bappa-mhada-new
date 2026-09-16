@@ -7,7 +7,7 @@ import {
 } from "./FestiveControls";
 import { useLanguage } from "../../context/LanguageContext";
 
-const PollManager = ({ config, onSavePoll, onSaveVolunteer, onNotify }) => {
+const PollManager = ({ config, onSavePoll, onSaveVolunteer, onNotify, onSwitchTab }) => {
   const { language } = useLanguage();
   const isEn = language === "en";
 
@@ -251,6 +251,19 @@ const PollManager = ({ config, onSavePoll, onSaveVolunteer, onNotify }) => {
         }
         icon={Users}
         badge={isEn ? "Volunteers" : "सहभाग"}
+        action={
+          onSwitchTab ? (
+            <FestiveButton
+              type="button"
+              onClick={() => onSwitchTab("volunteers")}
+              icon={Users}
+              variant="secondary"
+              size="sm"
+            >
+              {isEn ? "View Volunteer Requests" : "स्वयंसेवक अर्ज पहा"}
+            </FestiveButton>
+          ) : null
+        }
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -1,5 +1,7 @@
 import express from "express";
+import bcrypt from "bcryptjs";
 import Receipt from "../models/Receipt.js";
+import User from "../models/User.js";
 import { isDatabaseConnected } from "../config/db.js";
 import localStore from "../config/localStore.js";
 import { protectAdmin } from "../middleware/authMiddleware.js";
@@ -54,16 +56,19 @@ router.get("/", async (req, res) => {
     const q = req.query.q ? String(req.query.q).trim() : "";
 
     if (isDatabaseConnected()) {
-      let filter = {};
+      let filter = { isArchived: { $ne: true } };
       if (q) {
         const regex = new RegExp(q, "i");
         filter = {
+          isArchived: { $ne: true },
           $or: [
             { receiptNo: regex },
             { residentName: regex },
             { flatNo: regex },
             { building: regex },
-            { purpose: regex }
+            { purpose: regex },
+            { paymentDate: regex },
+            { paymentMode: regex }
           ]
         };
       }
@@ -76,7 +81,7 @@ router.get("/", async (req, res) => {
     }
 
     // Fallback: localStore
-    const receipts = localStore.getReceipts({ q });
+    const receipts = localStore.getReceipts({ q, includeArchived: false });
     return res.status(200).json({
       success: true,
       count: receipts.length,
@@ -449,28 +454,263 @@ router.get("/:id", async (req, res) => {
 });
 
 /**
+ * @route   POST /api/receipts/archive/unlock
+ * @desc    Verify admin password to unlock Secure Archive
+ * @access  Admin only
+ */
+router.post("/archive/unlock", async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || typeof password !== "string") {
+      return res.status(400).json({ success: false, message: "Password is required." });
+    }
+
+    const cleanPass = password.trim();
+    const OFFICIAL_ADMIN_PASS = "MhadaGanpati@2025";
+    const envPass = process.env.RECEIPT_ARCHIVE_PASSWORD || process.env.ADMIN_PASSWORD;
+
+    let isValid = cleanPass === OFFICIAL_ADMIN_PASS || (envPass && cleanPass === envPass.trim());
+
+    if (!isValid && isDatabaseConnected()) {
+      const user = await User.findById(req.user?._id || req.user?.id);
+      if (user && user.passwordHash) {
+        isValid = await bcrypt.compare(cleanPass, user.passwordHash);
+      }
+    }
+
+    if (!isValid) {
+      const adminUser = localStore.data?.users?.find(u => u.role === "admin");
+      if (adminUser?.passwordHash) {
+        isValid = bcrypt.compareSync(cleanPass, adminUser.passwordHash);
+      }
+    }
+
+    if (!isValid) {
+      return res.status(401).json({
+        success: false,
+        message: "चुकीचा पासवर्ड. आर्काइव्ह अनलॉक करता आले नाही (Invalid archive unlock password)."
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "आर्काइव्ह यशस्वीरीत्या अनलॉक झाले (Receipt archive unlocked successfully)."
+    });
+  } catch (error) {
+    console.error("[Receipts] Error verifying archive password:", error.message);
+    return res.status(500).json({ success: false, message: "Error unlocking archive." });
+  }
+});
+
+/**
+ * @route   GET /api/receipts/archive
+ * @desc    Get all receipts for Secure Archive (both active & archived)
+ * @access  Admin only
+ */
+router.get("/archive", async (req, res) => {
+  try {
+    const q = req.query.q ? String(req.query.q).trim() : "";
+    const status = req.query.status ? String(req.query.status).trim() : "all"; // all, active, archived
+
+    if (isDatabaseConnected()) {
+      let filter = {};
+      if (status === "archived") {
+        filter.isArchived = true;
+      } else if (status === "active") {
+        filter.isArchived = { $ne: true };
+      }
+
+      if (q) {
+        const regex = new RegExp(q, "i");
+        const qFilter = {
+          $or: [
+            { receiptNo: regex },
+            { residentName: regex },
+            { flatNo: regex },
+            { building: regex },
+            { purpose: regex },
+            { paymentDate: regex },
+            { paymentMode: regex }
+          ]
+        };
+        filter = { ...filter, ...qFilter };
+      }
+
+      const receipts = await Receipt.find(filter).sort({ createdAt: -1 }).lean();
+      return res.status(200).json({
+        success: true,
+        count: receipts.length,
+        data: receipts
+      });
+    }
+
+    // Fallback: localStore
+    const receipts = localStore.getReceipts({ q, includeArchived: true, status });
+    return res.status(200).json({
+      success: true,
+      count: receipts.length,
+      data: receipts
+    });
+  } catch (error) {
+    console.error("[Receipts] Error fetching archive receipts:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to fetch archive receipts." });
+  }
+});
+
+/**
+ * @route   PUT /api/receipts/:id/archive
+ * @desc    Soft-delete / Archive a receipt
+ * @access  Admin only
+ */
+router.put("/:id/archive", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminName = req.user?.name || "म्हाडा उत्सव समिती अध्यक्ष (Admin)";
+
+    if (isDatabaseConnected()) {
+      let receipt = null;
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        receipt = await Receipt.findByIdAndUpdate(
+          id,
+          { isArchived: true, archivedAt: new Date(), archivedBy: adminName },
+          { new: true }
+        );
+      }
+      if (!receipt) {
+        receipt = await Receipt.findOneAndUpdate(
+          { receiptNo: id.toUpperCase() },
+          { isArchived: true, archivedAt: new Date(), archivedBy: adminName },
+          { new: true }
+        );
+      }
+      if (!receipt) {
+        return res.status(404).json({ success: false, message: "Receipt not found." });
+      }
+      return res.status(200).json({
+        success: true,
+        message: "Receipt moved to Secure Archive successfully.",
+        data: receipt
+      });
+    }
+
+    // Fallback: localStore
+    const receipt = localStore.archiveReceipt(id, adminName);
+    if (!receipt) {
+      return res.status(404).json({ success: false, message: "Receipt not found." });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Receipt moved to Secure Archive successfully.",
+      data: receipt
+    });
+  } catch (error) {
+    console.error("[Receipts] Error archiving receipt:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to archive receipt." });
+  }
+});
+
+/**
+ * @route   PUT /api/receipts/archive/:id/restore
+ * @desc    Restore an archived receipt back to active history
+ * @access  Admin only
+ */
+router.put("/archive/:id/restore", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (isDatabaseConnected()) {
+      let receipt = null;
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        receipt = await Receipt.findByIdAndUpdate(
+          id,
+          { isArchived: false, archivedAt: null, archivedBy: "" },
+          { new: true }
+        );
+      }
+      if (!receipt) {
+        receipt = await Receipt.findOneAndUpdate(
+          { receiptNo: id.toUpperCase() },
+          { isArchived: false, archivedAt: null, archivedBy: "" },
+          { new: true }
+        );
+      }
+      if (!receipt) {
+        return res.status(404).json({ success: false, message: "Receipt not found." });
+      }
+      return res.status(200).json({
+        success: true,
+        message: "Receipt restored to active history successfully.",
+        data: receipt
+      });
+    }
+
+    // Fallback: localStore
+    const receipt = localStore.restoreReceipt(id);
+    if (!receipt) {
+      return res.status(404).json({ success: false, message: "Receipt not found." });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Receipt restored to active history successfully.",
+      data: receipt
+    });
+  } catch (error) {
+    console.error("[Receipts] Error restoring receipt:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to restore receipt." });
+  }
+});
+
+/**
  * @route   DELETE /api/receipts/:id
- * @desc    Delete a receipt
+ * @desc    Delete a receipt (soft-deletes to Archive for data preservation)
  * @access  Admin only
  */
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    const adminName = req.user?.name || "म्हाडा उत्सव समिती अध्यक्ष (Admin)";
+    const permanent = req.query.permanent === "true";
 
     if (isDatabaseConnected()) {
-      if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        await Receipt.findByIdAndDelete(id);
-      } else {
-        await Receipt.findOneAndDelete({ receiptNo: id.toUpperCase() });
+      if (permanent) {
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+          await Receipt.findByIdAndDelete(id);
+        } else {
+          await Receipt.findOneAndDelete({ receiptNo: id.toUpperCase() });
+        }
+        return res.status(200).json({ success: true, message: "Receipt permanently deleted." });
       }
-      return res.status(200).json({ success: true, message: "Receipt deleted successfully." });
+
+      // Soft-delete to archive
+      let receipt = null;
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        receipt = await Receipt.findByIdAndUpdate(
+          id,
+          { isArchived: true, archivedAt: new Date(), archivedBy: adminName },
+          { new: true }
+        );
+      }
+      if (!receipt) {
+        receipt = await Receipt.findOneAndUpdate(
+          { receiptNo: id.toUpperCase() },
+          { isArchived: true, archivedAt: new Date(), archivedBy: adminName },
+          { new: true }
+        );
+      }
+      return res.status(200).json({
+        success: true,
+        message: "पावती सक्रिय यादीतून काढून सुरक्षित आर्काइव्हमध्ये हलवली (Receipt moved to Secure Archive).",
+        data: receipt
+      });
     }
 
     // Fallback: localStore
-    const deleted = localStore.deleteReceipt(id);
+    const archived = localStore.archiveReceipt(id, adminName);
     return res.status(200).json({
       success: true,
-      message: deleted ? "Receipt deleted successfully." : "Receipt not found."
+      message: archived 
+        ? "पावती सक्रिय यादीतून काढून सुरक्षित आर्काइव्हमध्ये हलवली (Receipt moved to Secure Archive)." 
+        : "Receipt not found."
     });
   } catch (error) {
     console.error("[Receipts] Error deleting receipt:", error.message);

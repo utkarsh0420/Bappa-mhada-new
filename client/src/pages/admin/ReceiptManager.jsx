@@ -3,7 +3,8 @@ import {
   Receipt, PlusCircle, History, Settings, Sparkles, Download, 
   Printer, Eye, RefreshCw, Upload, Trash2, CheckCircle2, 
   AlertCircle, Search, Calendar, User, Home, Building2, 
-  CreditCard, FileText, IndianRupee, ShieldCheck, X
+  CreditCard, FileText, IndianRupee, ShieldCheck, X,
+  Lock, Unlock, Archive, RotateCcw, ShieldAlert
 } from "lucide-react";
 import API from "../../services/api";
 import { useLanguage } from "../../context/LanguageContext";
@@ -54,11 +55,21 @@ const numberToWordsIndian = (num) => {
   return `${inWords(n)} Rupees Only`;
 };
 
+// Official Building / Wing Options
+const BUILDING_OPTIONS = [
+  "G विंग - नंदादेवी / G Wing - Nandadevi",
+  "H विंग - निलगिरी / H Wing - Nilgiri",
+  "I विंग - ब्रह्मगिरी / I Wing - Brahmagiri",
+  "J विंग - पूर्वांचल / J Wing - Purvanchal",
+  "K विंग - गोवर्धन / K Wing - Govardhan",
+  "Other"
+];
+
 const ReceiptManager = ({ config, onNotify }) => {
   const { language } = useLanguage();
   const isEn = language === "en";
 
-  const [activeTab, setActiveTab] = useState("generate"); // 'generate' | 'history' | 'settings'
+  const [activeTab, setActiveTab] = useState("generate"); // 'generate' | 'history' | 'archive' | 'settings'
 
   // Settings State
   const [receiptSettings, setReceiptSettings] = useState({
@@ -73,7 +84,7 @@ const ReceiptManager = ({ config, onNotify }) => {
   const [formData, setFormData] = useState({
     residentName: "",
     flatNo: "",
-    building: "Wing G - नंदादेवी",
+    building: "G विंग - नंदादेवी / G Wing - Nandadevi",
     customBuilding: "",
     purpose: "श्री गणेशोत्सव वर्गणी (Ganesh Utsav Contribution)",
     customPurpose: "",
@@ -96,6 +107,24 @@ const ReceiptManager = ({ config, onNotify }) => {
   const [receiptsList, setReceiptsList] = useState([]);
   const [isLoadingReceipts, setIsLoadingReceipts] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Delete Receipt Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [receiptToDelete, setReceiptToDelete] = useState(null);
+  const [isDeletingReceipt, setIsDeletingReceipt] = useState(false);
+
+  // Secure Complete Archive State
+  const [isArchiveUnlocked, setIsArchiveUnlocked] = useState(false);
+  const [archivePassword, setArchivePassword] = useState("");
+  const [isUnlockingArchive, setIsUnlockingArchive] = useState(false);
+  const [archiveUnlockError, setArchiveUnlockError] = useState("");
+  const [archiveReceipts, setArchiveReceipts] = useState([]);
+  const [isLoadingArchive, setIsLoadingArchive] = useState(false);
+  const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
+  const [archiveStatusFilter, setArchiveStatusFilter] = useState("all"); // 'all' | 'active' | 'archived'
+  const [isRestoringReceipt, setIsRestoringReceipt] = useState(false);
+  const [receiptToRestore, setReceiptToRestore] = useState(null);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
 
   // Preview & Print State
   const [previewReceipt, setPreviewReceipt] = useState(null);
@@ -335,18 +364,16 @@ const ReceiptManager = ({ config, onNotify }) => {
     return null;
   };
 
-  // Generate & Download PDF
+  // Generate & Download PDF with proportional A4 fit (Never crops bottom/signature)
   const handleDownloadPdf = async (receiptData) => {
     const targetReceipt = receiptData || previewReceipt;
     if (!targetReceipt) return;
 
     setIsGeneratingPdf(true);
     try {
-      // If modal is not open, open it briefly to render
       if (!isPreviewModalOpen) {
         setPreviewReceipt(targetReceipt);
         setIsPreviewModalOpen(true);
-        // Wait a frame for DOM render
         await new Promise((r) => setTimeout(r, 200));
       }
 
@@ -368,10 +395,25 @@ const ReceiptManager = ({ config, onNotify }) => {
         format: "a4"
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pageWidth = pdf.internal.pageSize.getWidth(); // 210mm
+      const pageHeight = pdf.internal.pageSize.getHeight(); // 297mm
+      const margin = 10; // 10mm margins on all sides
+      const maxW = pageWidth - (margin * 2); // 190mm
+      const maxH = pageHeight - (margin * 2); // 277mm
 
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      let renderW = maxW;
+      let renderH = (canvas.height * renderW) / canvas.width;
+
+      // Scale down proportionally if height exceeds A4 printable area
+      if (renderH > maxH) {
+        renderH = maxH;
+        renderW = (canvas.width * renderH) / canvas.height;
+      }
+
+      const xOffset = margin + (maxW - renderW) / 2;
+      const yOffset = margin + (maxH - renderH) / 2;
+
+      pdf.addImage(imgData, "PNG", xOffset, yOffset, renderW, renderH, undefined, "FAST");
       const safeFilename = `Receipt_${(targetReceipt.receiptNo || "MT").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
       pdf.save(safeFilename);
 
@@ -406,7 +448,7 @@ const ReceiptManager = ({ config, onNotify }) => {
     setFormData({
       residentName: "",
       flatNo: "",
-      building: "Wing G - नंदादेवी",
+      building: "G विंग - नंदादेवी / G Wing - Nandadevi",
       customBuilding: "",
       purpose: "श्री गणेशोत्सव वर्गणी (Ganesh Utsav Contribution)",
       customPurpose: "",
@@ -421,6 +463,112 @@ const ReceiptManager = ({ config, onNotify }) => {
     });
     setValidationErrors({});
     fetchNextReceiptNumber();
+  };
+
+  // Fetch Complete Archive Receipts
+  const fetchArchiveReceipts = async (query = archiveSearchQuery, status = archiveStatusFilter) => {
+    setIsLoadingArchive(true);
+    try {
+      const res = await API.get(`/receipts/archive?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setArchiveReceipts(res.data.data);
+      }
+    } catch (err) {
+      console.error("[ReceiptManager] Archive fetch error:", err);
+    } finally {
+      setIsLoadingArchive(false);
+    }
+  };
+
+  // Confirm Delete Receipt (Moves to Secure Archive)
+  const handleConfirmDelete = async () => {
+    if (!receiptToDelete) return;
+    setIsDeletingReceipt(true);
+    try {
+      const res = await API.put(`/receipts/${receiptToDelete._id || receiptToDelete.receiptNo}/archive`);
+      if (res.data?.success) {
+        if (onNotify) {
+          onNotify(
+            isEn 
+              ? `Receipt ${receiptToDelete.receiptNo} moved to Secure Archive.` 
+              : `पावती ${receiptToDelete.receiptNo} सक्रिय यादीतून काढून सुरक्षित आर्काइव्हमध्ये हलवली.`,
+            "success"
+          );
+        }
+        setIsDeleteModalOpen(false);
+        setReceiptToDelete(null);
+        fetchReceiptsHistory();
+        if (isArchiveUnlocked) {
+          fetchArchiveReceipts();
+        }
+      }
+    } catch (err) {
+      console.error("[ReceiptManager] Delete error:", err);
+      const msg = err.response?.data?.message || (isEn ? "Failed to delete receipt." : "पावती हटवताना त्रुटी आली.");
+      if (onNotify) onNotify(msg, "error");
+    } finally {
+      setIsDeletingReceipt(false);
+    }
+  };
+
+  // Unlock Archive with Backend Verification
+  const handleUnlockArchive = async (e) => {
+    if (e) e.preventDefault();
+    if (!archivePassword) {
+      setArchiveUnlockError(isEn ? "Please enter admin password" : "कृपया ॲडमिन पासवर्ड प्रविष्ट करा");
+      return;
+    }
+    setIsUnlockingArchive(true);
+    setArchiveUnlockError("");
+    try {
+      const res = await API.post("/receipts/archive/unlock", { password: archivePassword });
+      if (res.data?.success) {
+        setIsArchiveUnlocked(true);
+        setArchivePassword("");
+        fetchArchiveReceipts("", "all");
+        if (onNotify) {
+          onNotify(
+            isEn ? "Complete Receipt Archive unlocked!" : "संपूर्ण पावती संग्रह अनलॉक झाला!",
+            "success"
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[ReceiptManager] Archive unlock error:", err);
+      const msg = err.response?.data?.message || (isEn ? "Invalid password" : "चुकीचा पासवर्ड");
+      setArchiveUnlockError(msg);
+    } finally {
+      setIsUnlockingArchive(false);
+    }
+  };
+
+  // Confirm Restore Receipt from Archive
+  const handleConfirmRestore = async () => {
+    if (!receiptToRestore) return;
+    setIsRestoringReceipt(true);
+    try {
+      const res = await API.put(`/receipts/archive/${receiptToRestore._id || receiptToRestore.receiptNo}/restore`);
+      if (res.data?.success) {
+        if (onNotify) {
+          onNotify(
+            isEn 
+              ? `Receipt ${receiptToRestore.receiptNo} restored to active history.` 
+              : `पावती ${receiptToRestore.receiptNo} पुन्हा सक्रिय यादीत पुनर्संचयित केली.`,
+            "success"
+          );
+        }
+        setIsRestoreModalOpen(false);
+        setReceiptToRestore(null);
+        fetchReceiptsHistory();
+        fetchArchiveReceipts();
+      }
+    } catch (err) {
+      console.error("[ReceiptManager] Restore error:", err);
+      const msg = err.response?.data?.message || (isEn ? "Failed to restore receipt." : "पावती पुनर्संचयित करताना त्रुटी आली.");
+      if (onNotify) onNotify(msg, "error");
+    } finally {
+      setIsRestoringReceipt(false);
+    }
   };
 
   return (
@@ -458,7 +606,10 @@ const ReceiptManager = ({ config, onNotify }) => {
               <span>{isEn ? "Generate Receipt" : "नवीन पावती"}</span>
             </button>
             <button
-              onClick={() => setActiveTab("history")}
+              onClick={() => {
+                setActiveTab("history");
+                fetchReceiptsHistory();
+              }}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 activeTab === "history"
                   ? "bg-maroon-900 text-gold-200 shadow-xs"
@@ -472,6 +623,25 @@ const ReceiptManager = ({ config, onNotify }) => {
               </span>
             </button>
             <button
+              onClick={() => {
+                setActiveTab("archive");
+                if (isArchiveUnlocked) fetchArchiveReceipts();
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "archive"
+                  ? "bg-maroon-900 text-gold-200 shadow-xs"
+                  : "text-maroon-900 hover:bg-white/80"
+              }`}
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>{isEn ? "Complete Archive" : "सर्व पावती संग्रह"}</span>
+              {isArchiveUnlocked ? (
+                <Unlock className="w-3 h-3 text-emerald-600" />
+              ) : (
+                <Lock className="w-3 h-3 text-amber-700" />
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab("settings")}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 activeTab === "settings"
@@ -480,7 +650,7 @@ const ReceiptManager = ({ config, onNotify }) => {
               }`}
             >
               <Settings className="w-3.5 h-3.5" />
-              <span>{isEn ? "SACHIV Signature" : "सचिव स्वाक्षरी"}</span>
+              <span>{isEn ? "Signature Settings" : "स्वाक्षरी व्यवस्थापन"}</span>
             </button>
           </div>
         </div>
@@ -616,13 +786,11 @@ const ReceiptManager = ({ config, onNotify }) => {
                       onChange={(e) => setFormData({ ...formData, building: e.target.value })}
                       className="w-full px-3.5 py-2 text-sm bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-gold-500 focus:outline-hidden"
                     >
-                      <option value="Wing G - नंदादेवी">Wing G - नंदादेवी (Nandadevi)</option>
-                      <option value="Wing H - निलगिरी">Wing H - निलगिरी (Nilgiri)</option>
-                      <option value="Wing J - कांचनगंगा">Wing J - कांचनगंगा (Kanchanganga)</option>
-                      <option value="Wing K - धवलगिरी">Wing K - धवलगिरी (Dhavalgiri)</option>
-                      <option value="Wing I - पूर्वांचल">Wing I - पूर्वांचल (Purvanchal)</option>
-                      <option value="All Buildings Joint">सर्व इमारती संयुक्त (All Wings Joint)</option>
-                      <option value="Other">Other / Custom Building</option>
+                      {BUILDING_OPTIONS.map((bldg, idx) => (
+                        <option key={idx} value={bldg}>
+                          {bldg === "Other" ? (isEn ? "Other / Custom Building" : "इतर इमारत / Custom Building") : bldg}
+                        </option>
+                      ))}
                     </select>
 
                     {formData.building === "Other" && (
@@ -1006,13 +1174,13 @@ const ReceiptManager = ({ config, onNotify }) => {
                       <td className="px-4 py-3 text-stone-600">
                         {rcpt.paymentMode}
                       </td>
-                      <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                      <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
                         <button
                           onClick={() => {
                             setPreviewReceipt(rcpt);
                             setIsPreviewModalOpen(true);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-stone-100 hover:bg-gold-100 text-maroon-900 rounded-lg text-[11px] font-bold transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-stone-100 hover:bg-gold-100 text-maroon-900 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Preview</span>
@@ -1022,10 +1190,21 @@ const ReceiptManager = ({ config, onNotify }) => {
                             setPreviewReceipt(rcpt);
                             handleDownloadPdf(rcpt);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-maroon-900 hover:bg-maroon-950 text-gold-300 rounded-lg text-[11px] font-bold transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-maroon-900 hover:bg-maroon-950 text-gold-300 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
                         >
                           <Download className="w-3.5 h-3.5" />
                           <span>PDF</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setReceiptToDelete(rcpt);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                          title={isEn ? "Move to Secure Archive" : "सुरक्षित आर्काइव्हमध्ये हलवा"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>{isEn ? "Delete" : "हटवा"}</span>
                         </button>
                       </td>
                     </tr>
@@ -1037,18 +1216,284 @@ const ReceiptManager = ({ config, onNotify }) => {
         </div>
       )}
 
-      {/* TAB 3: SACHIV SIGNATURE SETTINGS */}
+      {/* TAB 3: SECURE COMPLETE RECEIPT ARCHIVE (Password Protected) */}
+      {activeTab === "archive" && (
+        <div className="bg-white rounded-2xl border-1.5 border-gold-300 p-5 sm:p-7 shadow-sm space-y-6">
+          
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gold-200 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-maroon-800" />
+                <h3 className="text-lg font-bold font-heading text-maroon-950">
+                  {isEn ? "Complete Receipt Archive (Audit Safe)" : "सुरक्षित संपूर्ण पावती संग्रह (Audit Archive)"}
+                </h3>
+                {isArchiveUnlocked ? (
+                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Unlock className="w-2.5 h-2.5" /> Unlocked
+                  </span>
+                ) : (
+                  <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> Password Protected
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-stone-500 mt-0.5">
+                {isEn 
+                  ? "Permanent audit vault for all generated receipts, including soft-deleted ones with restore capability."
+                  : "सर्व तयार केलेल्या व हटवलेल्या पावत्यांचा सुरक्षित संग्रह. येथून कोणतीही पावती पूर्ववत (Restore) करता येते."}
+              </p>
+            </div>
+
+            {/* Lock / Relock Button if unlocked */}
+            {isArchiveUnlocked && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsArchiveUnlocked(false);
+                  setArchivePassword("");
+                  if (onNotify) onNotify(isEn ? "Archive locked." : "संग्रह सुरक्षितपणे लॉक केला.", "info");
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-maroon-900 border border-stone-300 rounded-xl text-xs font-bold transition-all cursor-pointer self-start sm:self-auto"
+              >
+                <Lock className="w-3.5 h-3.5 text-maroon-800" />
+                <span>{isEn ? "Lock Archive" : "आर्काइव्ह लॉक करा"}</span>
+              </button>
+            )}
+          </div>
+
+          {/* IF LOCKED: PASSWORD ENTRY SCREEN */}
+          {!isArchiveUnlocked ? (
+            <div className="max-w-md mx-auto my-8 p-6 bg-gradient-to-br from-amber-50/50 via-white to-gold-50/40 rounded-2xl border-2 border-gold-300 shadow-md text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-maroon-900 to-maroon-800 text-gold-300 flex items-center justify-center mx-auto shadow-md">
+                <ShieldAlert className="w-7 h-7" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold font-heading text-maroon-950">
+                  {isEn ? "Enter Admin Password to Unlock" : "सुरक्षित संग्रह उघडण्यासाठी ॲडमिन पासवर्ड टाका"}
+                </h4>
+                <p className="text-xs text-stone-500 mt-1">
+                  {isEn 
+                    ? "Access to deleted receipts and the complete society audit log requires administrative verification." 
+                    : "हटवलेल्या पावत्या व संपूर्ण सोसायटी ऑडिट संग्रह पाहण्यासाठी ॲडमिन पासवर्ड आवश्यक आहे."}
+                </p>
+              </div>
+
+              <form onSubmit={handleUnlockArchive} className="space-y-3 pt-2">
+                <div>
+                  <input
+                    type="password"
+                    value={archivePassword}
+                    onChange={(e) => {
+                      setArchivePassword(e.target.value);
+                      setArchiveUnlockError("");
+                    }}
+                    placeholder={isEn ? "Enter society admin password..." : "ॲडमिन पासवर्ड प्रविष्ट करा..."}
+                    className="w-full px-4 py-2.5 text-sm bg-white border border-gold-400 rounded-xl focus:ring-2 focus:ring-gold-500 focus:outline-hidden text-center font-mono"
+                    autoFocus
+                  />
+                  {archiveUnlockError && (
+                    <p className="text-xs text-red-600 mt-1 font-bold">{archiveUnlockError}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isUnlockingArchive || !archivePassword}
+                  className="w-full py-2.5 bg-gradient-to-r from-maroon-900 to-maroon-800 hover:from-maroon-950 hover:to-maroon-900 text-gold-200 text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  <Unlock className="w-4 h-4" />
+                  <span>{isUnlockingArchive ? "Verifying..." : (isEn ? "Unlock Complete Archive" : "संग्रह अनलॉक करा")}</span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            /* IF UNLOCKED: ARCHIVE SEARCH, FILTER & TABLE */
+            <div className="space-y-4">
+              
+              {/* Filter & Search Toolbar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gold-50/60 p-3 rounded-xl border border-gold-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-maroon-900 whitespace-nowrap">
+                    {isEn ? "Filter Status:" : "स्थिती निवडा:"}
+                  </span>
+                  <select
+                    value={archiveStatusFilter}
+                    onChange={(e) => {
+                      setArchiveStatusFilter(e.target.value);
+                      fetchArchiveReceipts(archiveSearchQuery, e.target.value);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-white border border-gold-300 rounded-lg focus:outline-hidden text-maroon-950"
+                  >
+                    <option value="all">{isEn ? "All Records (Active & Archived)" : "सर्व नोंदी (सक्रिय व हटवलेल्या)"}</option>
+                    <option value="archived">{isEn ? "Archived / Deleted Only" : "केवळ हटवलेल्या / संग्रहित"}</option>
+                    <option value="active">{isEn ? "Active Only" : "केवळ सक्रिय"}</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 flex-grow sm:max-w-md">
+                  <div className="relative flex-grow">
+                    <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={archiveSearchQuery}
+                      onChange={(e) => {
+                        setArchiveSearchQuery(e.target.value);
+                        fetchArchiveReceipts(e.target.value, archiveStatusFilter);
+                      }}
+                      placeholder={isEn ? "Search by resident, flat, receipt no, purpose..." : "नाव, फ्लॅट, पावती क्र, कारण शोधा..."}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gold-300 rounded-xl focus:ring-2 focus:ring-gold-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fetchArchiveReceipts(archiveSearchQuery, archiveStatusFilter)}
+                    className="p-2 border border-gold-300 bg-white hover:bg-gold-100 rounded-xl text-maroon-900 transition-colors cursor-pointer"
+                    title="Refresh"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isLoadingArchive ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Archive Table */}
+              <div className="overflow-x-auto rounded-xl border border-gold-200">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gradient-to-r from-maroon-950 via-maroon-900 to-maroon-850 text-gold-200 uppercase font-heading text-[11px]">
+                    <tr>
+                      <th className="px-4 py-3">Receipt No</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Resident</th>
+                      <th className="px-4 py-3">Flat & Wing</th>
+                      <th className="px-4 py-3">Purpose</th>
+                      <th className="px-4 py-3">Amount</th>
+                      <th className="px-4 py-3">Archive Details</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-200">
+                    {isLoadingArchive ? (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-8 text-center text-stone-500">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-gold-600" />
+                          Loading complete archive...
+                        </td>
+                      </tr>
+                    ) : archiveReceipts.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-8 text-center text-stone-500">
+                          {isEn ? "No records found matching filter." : "कोणतीही नोंद आढळली नाही."}
+                        </td>
+                      </tr>
+                    ) : (
+                      archiveReceipts.map((rcpt) => (
+                        <tr 
+                          key={rcpt._id || rcpt.receiptNo} 
+                          className={`transition-colors ${rcpt.isArchived ? "bg-red-50/30 hover:bg-red-50/60" : "hover:bg-gold-50/50"}`}
+                        >
+                          <td className="px-4 py-3 font-mono font-bold text-maroon-950">
+                            {rcpt.receiptNo}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {rcpt.isArchived ? (
+                              <span className="bg-red-100 text-red-800 border border-red-300 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                {isEn ? "Archived / Deleted" : "हटवलेली / संग्रहित"}
+                              </span>
+                            ) : (
+                              <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                {isEn ? "Active" : "सक्रिय"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-stone-600 whitespace-nowrap">
+                            {rcpt.paymentDate}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-stone-900">
+                            {rcpt.residentName}
+                          </td>
+                          <td className="px-4 py-3 text-stone-700">
+                            {rcpt.flatNo} ({rcpt.building})
+                          </td>
+                          <td className="px-4 py-3 text-stone-700">
+                            <span className="bg-gold-100/70 text-maroon-950 px-2 py-0.5 rounded text-[11px] font-medium">
+                              {rcpt.purpose}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-emerald-700 whitespace-nowrap">
+                            ₹{Number(rcpt.amount).toLocaleString("en-IN")}
+                          </td>
+                          <td className="px-4 py-3 text-stone-500 text-[11px] whitespace-nowrap">
+                            {rcpt.isArchived ? (
+                              <span>
+                                {rcpt.archivedAt ? new Date(rcpt.archivedAt).toLocaleDateString() : "Yes"}
+                                {rcpt.archivedBy ? ` (${rcpt.archivedBy})` : ""}
+                              </span>
+                            ) : (
+                              <span className="text-stone-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                setPreviewReceipt(rcpt);
+                                setIsPreviewModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-stone-100 hover:bg-gold-100 text-maroon-900 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                              title="Preview"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Preview</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPreviewReceipt(rcpt);
+                                handleDownloadPdf(rcpt);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-maroon-900 hover:bg-maroon-950 text-gold-300 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                              title="Download PDF"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>PDF</span>
+                            </button>
+                            {rcpt.isArchived && (
+                              <button
+                                onClick={() => {
+                                  setReceiptToRestore(rcpt);
+                                  setIsRestoreModalOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                                title={isEn ? "Restore to active history" : "सक्रिय यादीत पूर्ववत करा"}
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>{isEn ? "Restore" : "पुनर्संचयित"}</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* TAB 4: DIGITAL SIGNATURE SETTINGS */}
       {activeTab === "settings" && (
         <div className="max-w-2xl mx-auto bg-white rounded-2xl border-1.5 border-gold-300 p-6 space-y-6 shadow-sm">
           <div className="border-b border-gold-200 pb-3">
             <h3 className="text-lg font-bold font-heading text-maroon-950 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-maroon-800" />
-              {isEn ? "SACHIV Digital Signature Management" : "सचिव डिजिटल स्वाक्षरी व्यवस्थापन"}
+              {isEn ? "Digital Signature Management" : "अधिकृत डिजिटल स्वाक्षरी व्यवस्थापन"}
             </h3>
             <p className="text-xs text-stone-600 mt-1">
               {isEn 
-                ? "Upload the official digital signature of SACHIV (Secretary). Once saved, it will automatically appear on all generated receipt vouchers." 
-                : "मंडळ सचिवांची (SACHIV) अधिकृत डिजिटल स्वाक्षरी येथे अपलोड करा. ही स्वाक्षरी सर्व पावत्यांवर आपोआप येईल."}
+                ? "Upload the official digital signature for authorized receipt vouchers. Once saved, it will automatically appear on all generated receipt vouchers." 
+                : "मंडळाच्या अधिकृत स्वाक्षरीचा फोटो येथे अपलोड करा. ही स्वाक्षरी सर्व पावत्यांवर आपोआप येईल."}
             </p>
           </div>
 
@@ -1059,12 +1504,12 @@ const ReceiptManager = ({ config, onNotify }) => {
                 <div className="inline-block p-4 bg-white rounded-xl border border-gold-300 shadow-sm">
                   <img
                     src={receiptSettings.sachivSignatureUrl}
-                    alt="Current SACHIV Signature"
+                    alt="Current Digital Signature"
                     className="max-h-28 max-w-xs object-contain mx-auto"
                   />
                   <div className="mt-2 pt-2 border-t border-stone-200 text-center">
-                    <span className="text-xs font-bold uppercase tracking-widest text-maroon-900">
-                      SACHIV (सचिव)
+                    <span className="text-xs font-bold text-maroon-900">
+                      सचिव / अधिकृत स्वाक्षरी
                     </span>
                   </div>
                 </div>
@@ -1073,7 +1518,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                     type="button"
                     onClick={() => signatureInputRef.current?.click()}
                     disabled={isUploadingSignature}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span>{isUploadingSignature ? "Uploading..." : (isEn ? "Replace Signature" : "स्वाक्षरी बदला")}</span>
@@ -1081,7 +1526,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                   <button
                     type="button"
                     onClick={handleRemoveSignature}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 text-xs font-bold rounded-xl transition-all"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>{isEn ? "Remove Signature" : "काढून टाका"}</span>
@@ -1105,7 +1550,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                   type="button"
                   onClick={() => signatureInputRef.current?.click()}
                   disabled={isUploadingSignature}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-maroon-900 hover:bg-maroon-950 text-gold-300 text-xs font-bold rounded-xl shadow-md transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-maroon-900 hover:bg-maroon-950 text-gold-300 text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
                 >
                   <Upload className="w-4 h-4" />
                   <span>{isUploadingSignature ? "Uploading..." : (isEn ? "Upload Signature Image" : "स्वाक्षरी फोटो अपलोड करा")}</span>
@@ -1137,13 +1582,13 @@ const ReceiptManager = ({ config, onNotify }) => {
         </div>
       )}
 
-      {/* MODAL: RECEIPT PREVIEW & PDF CONTAINER */}
+      {/* MODAL 1: RECEIPT PREVIEW & PDF CONTAINER (Fully Enclosed Inside Borders & A4 Proportionate) */}
       {isPreviewModalOpen && previewReceipt && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border-2 border-gold-400 overflow-hidden my-auto animate-in fade-in zoom-in duration-150">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full border-2 border-gold-400 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in fade-in zoom-in duration-150">
             
             {/* Modal Actions Header */}
-            <div className="p-3 sm:p-4 bg-gradient-to-r from-maroon-950 via-maroon-900 to-maroon-850 text-gold-200 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 bg-gradient-to-r from-maroon-950 via-maroon-900 to-maroon-850 text-gold-200 flex items-center justify-between flex-shrink-0 shadow-xs">
               <div className="flex items-center gap-2 text-xs sm:text-sm font-bold font-heading">
                 <Receipt className="w-4 h-4 text-gold-400" />
                 <span>{isEn ? "Official Receipt Voucher Preview" : "अधिकृत पावती पूर्वावलोकन"}</span>
@@ -1152,7 +1597,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">{isEn ? "Print" : "प्रिंट"}</span>
@@ -1161,7 +1606,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                   type="button"
                   onClick={() => handleDownloadPdf(previewReceipt)}
                   disabled={isGeneratingPdf}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-gold-400 hover:bg-gold-500 text-maroon-950 rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gold-400 hover:bg-gold-500 text-maroon-950 rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-60 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>{isGeneratingPdf ? "Generating..." : (isEn ? "Download PDF" : "PDF डाऊनलोड")}</span>
@@ -1169,7 +1614,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                 <button
                   type="button"
                   onClick={() => setIsPreviewModalOpen(false)}
-                  className="p-1 hover:bg-white/20 rounded-lg text-gold-300 transition-colors"
+                  className="p-1 hover:bg-white/20 rounded-lg text-gold-300 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1177,19 +1622,23 @@ const ReceiptManager = ({ config, onNotify }) => {
             </div>
 
             {/* Scrollable Receipt Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto max-h-[80vh] bg-stone-100 flex justify-center">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-stone-100/80 flex justify-center items-start">
               
               {/* THE OFFICIAL RECEIPT VOUCHER (This DOM node is captured for PDF) */}
               <div
                 ref={receiptVoucherRef}
-                className="w-full max-w-[620px] bg-white border-2 border-maroon-900 p-6 sm:p-8 rounded-lg shadow-md text-maroon-950 font-body relative"
-                style={{ backgroundColor: "#FFFFFF" }}
+                id="society-official-receipt-voucher"
+                className="w-full max-w-[640px] bg-white border-2 border-maroon-900 p-5 sm:p-7 rounded-xl shadow-md text-maroon-950 font-body relative box-border"
+                style={{ backgroundColor: "#FFFFFF", boxSizing: "border-box" }}
               >
-                {/* Decorative border frame */}
-                <div className="border border-gold-500 p-5 sm:p-6 rounded relative">
+                {/* Inner Decorative Gold Border */}
+                <div 
+                  className="border-1.5 border-gold-500 p-4 sm:p-6 rounded-lg relative box-border bg-white flex flex-col space-y-3.5"
+                  style={{ boxSizing: "border-box" }}
+                >
                   
                   {/* Top Society Header */}
-                  <div className="flex items-center justify-between gap-4 border-b-2 border-maroon-900 pb-4">
+                  <div className="flex items-center justify-between gap-4 border-b-2 border-maroon-900 pb-3">
                     <img
                       src="/logo.jpg"
                       alt="Society Logo"
@@ -1200,31 +1649,31 @@ const ReceiptManager = ({ config, onNotify }) => {
                         ॥ श्री गणेशाय नमः ॥
                       </div>
                       <h1 className="text-lg sm:text-xl font-black font-heading text-maroon-950 leading-tight">
-                        {previewReceipt.societyNameMr || "म्हाडा टॉवर्स उत्सव मंडळ"}
+                        {previewReceipt.societyNameMr || config?.mandalNameMr || "म्हाडा टॉवर्स उत्सव मंडळ"}
                       </h1>
                       <h2 className="text-xs sm:text-sm font-bold text-maroon-800 tracking-wide font-heading">
-                        {previewReceipt.societyNameEn || "MHADA Towers Utsav Mandal"}
+                        {previewReceipt.societyNameEn || config?.mandalNameEn || "MHADA Towers Utsav Mandal"}
                       </h2>
                       <p className="text-[10px] sm:text-xs text-stone-600 mt-0.5">
-                        {previewReceipt.addressMr || "पिंपरी वाघेरे, पिंपरी चिंचवड, पुणे - ४११०१७"}
+                        {previewReceipt.addressMr || config?.addressMr || "पिंपरी वाघेरे, पिंपरी चिंचवड, पुणे - ४११०१७"}
                       </p>
                       <p className="text-[10px] text-amber-800 font-bold mt-0.5">
-                        धर्मादाय नोंदणी क्र. {previewReceipt.regNo || "१२४३/२०२५ - पुणे"}
+                        धर्मादाय नोंदणी क्र. {previewReceipt.regNo || config?.regNo || "१२४३/२०२५ - पुणे"}
                       </p>
                     </div>
                   </div>
 
                   {/* Receipt Badge Header */}
-                  <div className="my-3 text-center">
-                    <span className="inline-block bg-gradient-to-r from-maroon-900 to-maroon-800 text-gold-300 font-heading text-xs sm:text-sm font-black px-6 py-1 rounded-full uppercase tracking-wider shadow-xs">
+                  <div className="text-center my-0.5">
+                    <span className="inline-block bg-gradient-to-r from-maroon-900 to-maroon-850 text-gold-300 font-heading text-xs sm:text-sm font-black px-6 py-1 rounded-full uppercase tracking-wider shadow-xs">
                       पावती / OFFICIAL RECEIPT
                     </span>
                   </div>
 
-                  {/* Metadata Row: Receipt No & Date */}
-                  <div className="flex justify-between items-center text-xs py-2 px-3 bg-gold-50 border border-gold-300 rounded mb-4 font-mono font-bold text-maroon-950">
+                  {/* Metadata Row: Receipt Book No & Date */}
+                  <div className="flex justify-between items-center text-xs py-2 px-3 bg-gold-50/80 border border-gold-300 rounded font-mono font-bold text-maroon-950">
                     <div>
-                      <span>पावती क्र. / Receipt No: </span>
+                      <span>पावती पुस्तक क्रमांक / Receipt No: </span>
                       <span className="text-maroon-900 font-black">{previewReceipt.receiptNo}</span>
                     </div>
                     <div>
@@ -1234,51 +1683,51 @@ const ReceiptManager = ({ config, onNotify }) => {
                   </div>
 
                   {/* Resident Info Box */}
-                  <div className="space-y-2.5 text-xs sm:text-sm border-b border-stone-200 pb-4">
+                  <div className="space-y-2.5 text-xs sm:text-sm border-b border-stone-200 pb-3.5">
                     <div className="flex flex-col sm:flex-row sm:items-baseline gap-1">
-                      <span className="font-bold text-stone-600 sm:w-44 flex-shrink-0">
-                        रहिवाशाचे नाव / Received From:
+                      <span className="font-bold text-stone-600 sm:w-48 flex-shrink-0">
+                        श्री / श्रीमती / M/s (Received From):
                       </span>
-                      <span className="font-black text-maroon-950 font-heading text-sm sm:text-base border-b border-dotted border-stone-400 flex-grow">
+                      <span className="font-black text-maroon-950 font-heading text-sm sm:text-base border-b border-dotted border-stone-400 flex-grow break-words">
                         {previewReceipt.residentName}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                       <div className="flex items-baseline gap-1">
-                        <span className="font-bold text-stone-600">फ्लॅट क्र. / Flat No:</span>
+                        <span className="font-bold text-stone-600 flex-shrink-0">फ्लॅट क्र. / Flat No:</span>
                         <span className="font-black text-maroon-900 font-mono border-b border-dotted border-stone-400 flex-grow">
                           {previewReceipt.flatNo}
                         </span>
                       </div>
                       <div className="flex items-baseline gap-1">
-                        <span className="font-bold text-stone-600">इमारत / Building:</span>
-                        <span className="font-bold text-maroon-900 border-b border-dotted border-stone-400 flex-grow">
+                        <span className="font-bold text-stone-600 flex-shrink-0">इमारत / Building:</span>
+                        <span className="font-bold text-maroon-900 border-b border-dotted border-stone-400 flex-grow break-words">
                           {previewReceipt.building}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-baseline gap-1">
-                      <span className="font-bold text-stone-600 sm:w-44 flex-shrink-0">
-                        कारणास्तव / Receipt For:
+                      <span className="font-bold text-stone-600 sm:w-48 flex-shrink-0">
+                        कारणास्तव / On Account Of (Purpose):
                       </span>
-                      <span className="font-bold text-maroon-950 border-b border-dotted border-stone-400 flex-grow">
+                      <span className="font-bold text-maroon-950 border-b border-dotted border-stone-400 flex-grow break-words">
                         {previewReceipt.purpose}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
                       <div className="flex items-baseline gap-1">
-                        <span className="font-bold text-stone-600">पेमेंट पद्धत / Mode:</span>
+                        <span className="font-bold text-stone-600 flex-shrink-0">पेमेंट पद्धत / Mode:</span>
                         <span className="font-bold text-stone-900">
                           {previewReceipt.paymentMode}
                         </span>
                       </div>
                       {previewReceipt.transactionRef && (
                         <div className="flex items-baseline gap-1">
-                          <span className="font-bold text-stone-600">संदर्भ / Ref No:</span>
-                          <span className="font-mono text-stone-900">
+                          <span className="font-bold text-stone-600 flex-shrink-0">धनादेश / संदर्भ क्र. / Txn Ref:</span>
+                          <span className="font-mono text-stone-900 break-all">
                             {previewReceipt.transactionRef}
                           </span>
                         </div>
@@ -1287,18 +1736,18 @@ const ReceiptManager = ({ config, onNotify }) => {
                   </div>
 
                   {/* Amount Box */}
-                  <div className="my-4 p-3 bg-gradient-to-r from-amber-50 to-gold-50/60 border-2 border-gold-400 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="p-3 bg-gradient-to-r from-amber-50/90 via-gold-50/50 to-amber-50/80 border-2 border-gold-400 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 box-border">
                     <div>
                       <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600 block">
                         प्राप्त रक्कम / Amount Received:
                       </span>
-                      <span className="text-xl sm:text-2xl font-black text-maroon-950">
+                      <span className="text-xl sm:text-2xl font-black text-maroon-950 tracking-tight">
                         ₹ {Number(previewReceipt.amount).toLocaleString("en-IN")}/-
                       </span>
                     </div>
                     <div className="text-left sm:text-right">
-                      <span className="text-[10px] text-stone-500 block uppercase font-bold">In Words:</span>
-                      <span className="text-xs font-bold text-maroon-900 italic font-heading">
+                      <span className="text-[10px] text-stone-500 block uppercase font-bold">रक्कम अक्षरी / In Words:</span>
+                      <span className="text-xs font-bold text-maroon-900 italic font-heading break-words">
                         {previewReceipt.amountInWords || numberToWordsIndian(previewReceipt.amount)}
                       </span>
                     </div>
@@ -1306,37 +1755,40 @@ const ReceiptManager = ({ config, onNotify }) => {
 
                   {/* Description Acknowledgement Note */}
                   {previewReceipt.description && (
-                    <div className="p-3 bg-stone-50 border border-stone-200 rounded text-xs text-stone-800 leading-relaxed italic">
+                    <div className="p-2.5 bg-stone-50 border border-stone-200 rounded text-xs text-stone-800 leading-relaxed italic break-words">
                       "{previewReceipt.description}"
                     </div>
                   )}
 
                   {/* Signature and Footer Section */}
-                  <div className="mt-6 pt-4 border-t-2 border-maroon-900 flex justify-between items-end">
-                    <div className="text-[10px] text-stone-500 max-w-[260px] leading-tight space-y-0.5">
-                      <p className="font-bold text-stone-700">नोंद / Notes:</p>
+                  <div className="border-t-2 border-maroon-900 pt-3 flex justify-between items-end gap-3">
+                    <div className="text-[10px] text-stone-500 max-w-[280px] leading-tight space-y-0.5">
+                      <p className="font-bold text-stone-700">नोंद / Notes & Conditions:</p>
                       <p>• ही अधिकृत संगणकीय पावती आहे.</p>
                       <p>• धनादेश/ऑनलाइन ट्रान्सफर रकमेच्या वटण्यावर आधारित.</p>
-                      <p>• मंडळाच्या सर्व उपक्रमात सहकार्य केल्याबद्दल धन्यवाद.</p>
+                      <p>• मंडळाच्या सर्व उपक्रमात सहकार्य केल्याबद्दल सस्नेह धन्यवाद.</p>
                     </div>
 
-                    {/* SACHIV Signature Box */}
-                    <div className="text-center min-w-[140px] space-y-1">
+                    {/* Digital Signature Box */}
+                    <div className="text-center min-w-[140px] space-y-1 flex-shrink-0">
                       {previewReceipt.sachivSignatureUrl || receiptSettings.sachivSignatureUrl ? (
                         <img
                           src={previewReceipt.sachivSignatureUrl || receiptSettings.sachivSignatureUrl}
-                          alt="SACHIV Signature"
+                          alt="Digital Signature"
                           className="h-12 max-w-[140px] object-contain mx-auto"
                         />
                       ) : (
-                        <div className="h-10"></div>
+                        <div className="h-10 flex items-center justify-center text-[10px] text-stone-400 italic">
+                          (स्वाक्षरी / Signature)
+                        </div>
                       )}
                       <div className="border-t border-maroon-900 pt-1">
-                        <span className="text-xs font-black uppercase tracking-wider text-maroon-950 font-heading block">
-                          SACHIV
-                        </span>
-                        <span className="text-[10px] text-maroon-800 font-bold block">
+                        {/* NO "SACHIV" TEXT LABEL! ONLY OFFICIAL TITLE */}
+                        <span className="text-[11px] text-maroon-900 font-bold block leading-tight">
                           सचिव / अधिकृत स्वाक्षरी
+                        </span>
+                        <span className="text-[9px] text-stone-500 font-semibold block">
+                          Authorized Signatory
                         </span>
                       </div>
                     </div>
@@ -1348,7 +1800,7 @@ const ReceiptManager = ({ config, onNotify }) => {
             </div>
 
             {/* Modal Bottom Bar */}
-            <div className="p-4 bg-stone-50 border-t border-gold-300 flex items-center justify-between">
+            <div className="p-3.5 bg-stone-50 border-t border-gold-300 flex items-center justify-between flex-shrink-0">
               <span className="text-xs text-stone-500">
                 Ready for download or printing on standard A4 paper.
               </span>
@@ -1356,7 +1808,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                 <button
                   type="button"
                   onClick={() => setIsPreviewModalOpen(false)}
-                  className="px-4 py-1.5 border border-stone-300 text-stone-700 rounded-xl text-xs font-bold hover:bg-stone-100"
+                  className="px-4 py-1.5 border border-stone-300 text-stone-700 rounded-xl text-xs font-bold hover:bg-stone-100 cursor-pointer"
                 >
                   Close
                 </button>
@@ -1364,7 +1816,7 @@ const ReceiptManager = ({ config, onNotify }) => {
                   type="button"
                   onClick={() => handleDownloadPdf(previewReceipt)}
                   disabled={isGeneratingPdf}
-                  className="px-5 py-1.5 bg-maroon-900 hover:bg-maroon-950 text-gold-300 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 disabled:opacity-60"
+                  className="px-5 py-1.5 bg-maroon-900 hover:bg-maroon-950 text-gold-300 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>{isGeneratingPdf ? "Generating..." : "Download Official PDF"}</span>
@@ -1372,6 +1824,128 @@ const ReceiptManager = ({ config, onNotify }) => {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: DELETE RECEIPT CONFIRMATION (Soft-Delete to Secure Archive) */}
+      {isDeleteModalOpen && receiptToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border-2 border-red-300 overflow-hidden animate-in fade-in zoom-in duration-150">
+            <div className="p-4 bg-red-50 border-b border-red-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-red-950">
+                  {isEn ? "Confirm Receipt Deletion" : "पावती हटवण्याची खात्री करा"}
+                </h4>
+                <p className="text-xs text-red-700">
+                  {receiptToDelete.receiptNo}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-3 text-xs text-stone-700">
+              <p>
+                {isEn ? "Are you sure you want to delete receipt" : "आपण खरोखर खालील पावती हटवू इच्छिता का?"}:
+              </p>
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1 font-mono text-xs">
+                <div><strong>No:</strong> {receiptToDelete.receiptNo}</div>
+                <div><strong>Resident:</strong> {receiptToDelete.residentName}</div>
+                <div><strong>Flat:</strong> {receiptToDelete.flatNo} ({receiptToDelete.building})</div>
+                <div><strong>Amount:</strong> ₹{Number(receiptToDelete.amount).toLocaleString("en-IN")}</div>
+              </div>
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong>{isEn ? "Safe Preservation Guarantee:" : "सुरक्षित संग्रह हमी:"}</strong>
+                  <p className="mt-0.5">
+                    {isEn
+                      ? "This receipt will be hidden from the active list, but preserved permanently in the Complete Receipt Archive where it can be viewed or restored at any time."
+                      : "ही पावती सक्रिय यादीतून अदृश्य होईल, परंतु ती 'सुरक्षित पावती संग्रह' (Archive) मध्ये कायम राहील. तेथून ती पुन्हा पूर्ववत (Restore) करता येईल."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setReceiptToDelete(null);
+                }}
+                className="px-4 py-2 border border-stone-300 text-stone-700 rounded-xl text-xs font-bold hover:bg-stone-100 cursor-pointer"
+              >
+                {isEn ? "Cancel" : "रद्द करा"}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeletingReceipt}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeletingReceipt ? "Deleting..." : (isEn ? "Confirm Delete" : "हटवणे निश्चित करा")}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: RESTORE RECEIPT CONFIRMATION */}
+      {isRestoreModalOpen && receiptToRestore && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border-2 border-emerald-300 overflow-hidden animate-in fade-in zoom-in duration-150">
+            <div className="p-4 bg-emerald-50 border-b border-emerald-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-emerald-950">
+                  {isEn ? "Restore Receipt to Active List" : "पावती सक्रिय यादीत पूर्ववत करा"}
+                </h4>
+                <p className="text-xs text-emerald-700">
+                  {receiptToRestore.receiptNo}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-3 text-xs text-stone-700">
+              <p>
+                {isEn 
+                  ? "Are you sure you want to restore this receipt? It will re-appear in the main Receipt History."
+                  : "आपण ही पावती पुन्हा सक्रिय इतिहासात आणू इच्छिता का? ती मुख्य पावती यादीत दिसेल."}
+              </p>
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1 font-mono text-xs">
+                <div><strong>No:</strong> {receiptToRestore.receiptNo}</div>
+                <div><strong>Resident:</strong> {receiptToRestore.residentName}</div>
+                <div><strong>Amount:</strong> ₹{Number(receiptToRestore.amount).toLocaleString("en-IN")}</div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRestoreModalOpen(false);
+                  setReceiptToRestore(null);
+                }}
+                className="px-4 py-2 border border-stone-300 text-stone-700 rounded-xl text-xs font-bold hover:bg-stone-100 cursor-pointer"
+              >
+                {isEn ? "Cancel" : "रद्द करा"}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRestore}
+                disabled={isRestoringReceipt}
+                className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>{isRestoringReceipt ? "Restoring..." : (isEn ? "Restore Receipt" : "पुनर्संचयित करा")}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

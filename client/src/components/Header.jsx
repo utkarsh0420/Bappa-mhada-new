@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Home, Flame, Calendar, Sparkles, Image, Phone,
+  Home, Flame, Calendar, Sparkles, Image, Phone, Users,
   LayoutDashboard, LogIn, LogOut, 
   Menu, X, QrCode, Globe, Mail, ChevronRight,
   Trophy, CalendarDays, Table
@@ -14,7 +14,8 @@ const Header = ({
   onOpenAdminLogin, 
   onOpenAdminDashboard, 
   onOpenSidebar,
-  onOpenUpcomingCalendar 
+  onOpenUpcomingCalendar,
+  onOpenVolunteer
 }) => {
   const { admin, logout } = useAuth();
   const { config } = useConfig();
@@ -129,6 +130,16 @@ const Header = ({
       isActive: activeSection === "contacts-section",
       onClick: () => scrollToSection("contacts-section"),
     },
+    {
+      id: "volunteer-tab",
+      title: language === "mr" ? (config?.tabs?.volunteer?.labelMr || "सहभाग व सेवा") : (config?.tabs?.volunteer?.labelEn || "Volunteer Seva"),
+      icon: Users,
+      iconColor: "text-amber-400",
+      isActive: false,
+      onClick: () => {
+        if (onOpenVolunteer) onOpenVolunteer();
+      },
+    },
   ];
 
   const navTabs = allNavTabs.filter(tab => {
@@ -137,6 +148,7 @@ const Header = ({
     if (tab.id === "schedule-dropdown" && config?.tabs?.schedule?.enabled === false && config?.tabs?.cultural?.enabled === false) return false;
     if (tab.id === "gallery-section" && config?.tabs?.gallery?.enabled === false) return false;
     if (tab.id === "contacts-section" && config?.tabs?.contacts?.enabled === false) return false;
+    if (tab.id === "volunteer-tab" && (config?.tabs?.volunteer?.enabled === false || config?.volunteerSeva?.active === false)) return false;
     return true;
   });
 
@@ -331,6 +343,34 @@ const Header = ({
                 {language === "mr" ? "पॉप-अप" : "Pop-up"}
               </span>
             </button>
+
+            {/* Pop-up 3: Volunteer Registration */}
+            {config?.tabs?.volunteer?.enabled !== false && config?.volunteerSeva?.active !== false && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (onOpenVolunteer) onOpenVolunteer();
+                }}
+                className="w-full sm:col-span-2 flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-amber-900/90 via-maroon-900 to-amber-950/90 border-2 border-gold-400 text-gold-200 shadow-md active:scale-98 transition text-left"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-xl bg-gold-400 text-maroon-950 font-bold flex-shrink-0 shadow-sm">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-black text-gold-300 font-heading truncate">
+                      {language === "mr" ? (config?.tabs?.volunteer?.labelMr || "सहभाग व सेवा (Volunteer Seva)") : (config?.tabs?.volunteer?.labelEn || "Volunteer Seva")}
+                    </div>
+                    <div className="text-[10px] text-gold-100/80 truncate">
+                      {language === "mr" ? "स्वयंसेवक सेवा नोंदणी फॉर्म (पॉप-अप)" : "Volunteer Registration Form (Pop-up)"}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-gold-400 text-maroon-950 flex-shrink-0 ml-1">
+                  {language === "mr" ? "नोंदणी" : "Register"}
+                </span>
+              </button>
+            )}
           </div>
 
           {/* General Section Links */}

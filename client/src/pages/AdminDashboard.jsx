@@ -28,6 +28,7 @@ import GeneralSettings from "./admin/GeneralSettings";
 import ScrollerManager from "./admin/ScrollerManager";
 import WhatsAppBroadcastManager from "./admin/WhatsAppBroadcastManager";
 import ReceiptManager from "./admin/ReceiptManager";
+import VolunteerManager from "./admin/VolunteerManager";
 import { FestiveBadge, FestiveButton } from "./admin/FestiveControls";
 
 const AdminDashboard = ({ onClose }) => {
@@ -57,6 +58,8 @@ const AdminDashboard = ({ onClose }) => {
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [volunteersCount, setVolunteersCount] = useState(0);
+  const [newVolunteersCount, setNewVolunteersCount] = useState(0);
 
   const notify = (msg, type = "success") => {
     setNotification({ message: msg, type });
@@ -90,10 +93,24 @@ const AdminDashboard = ({ onClose }) => {
     }
   };
 
+  const fetchVolunteersCount = async () => {
+    try {
+      const res = await API.get("/volunteers");
+      if (res.data.success) {
+        setVolunteersCount(res.data.count || res.data.data?.length || 0);
+        const newOnes = (res.data.data || []).filter((v) => v.status === "New").length;
+        setNewVolunteersCount(newOnes);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchAnnouncements();
     fetchEvents();
     fetchContacts();
+    fetchVolunteersCount();
   }, []);
 
   const handleCloseDashboard = () => {
@@ -151,6 +168,7 @@ const AdminDashboard = ({ onClose }) => {
     { id: "events", label: language === "mr" ? "कार्यक्रम" : "Events Schedule", sublabel: language === "mr" ? "Events" : "कार्यक्रम", icon: Calendar, badge: events.length },
     { id: "gallery", label: language === "mr" ? "फोटो गॅलरी" : "Photo Gallery", sublabel: language === "mr" ? "Gallery" : "गॅलरी", icon: ImageIcon, badge: config?.gallery?.length || 0 },
     { id: "rules", label: language === "mr" ? "सोसायटी नियमावली" : "Society Rules", sublabel: language === "mr" ? "Rules" : "नियमावली", icon: FileText, badge: config?.rules?.length || 0 },
+    { id: "volunteers", label: language === "mr" ? "स्वयंसेवक अर्ज" : "Volunteer Requests", sublabel: language === "mr" ? "Volunteers" : "स्वयंसेवक विनंत्या", icon: Users, badge: newVolunteersCount > 0 ? `${newVolunteersCount} ${language === "mr" ? "नवीन" : "New"}` : (volunteersCount > 0 ? volunteersCount : undefined) },
     { id: "polls", label: language === "mr" ? "मतदान व स्वयंसेवक" : "Polls & Seva", sublabel: language === "mr" ? "Polls & Seva" : "मतदान व सेवा", icon: BarChart2 },
     { id: "contacts", label: language === "mr" ? "विंग प्रतिनिधी व संपर्क" : "Wing Contacts", sublabel: language === "mr" ? "Contacts" : "संपर्क", icon: Phone, badge: contacts.length },
     { id: "mandalInfo", label: language === "mr" ? "मंडळ माहिती व कार्यकारणी" : "Mandal Info & Committee", sublabel: language === "mr" ? "Mandal Info" : "मंडळ माहिती", icon: Info },
@@ -486,12 +504,19 @@ const AdminDashboard = ({ onClose }) => {
             />
           )}
 
+          {activeSubTab === "volunteers" && (
+            <VolunteerManager
+              onNotify={notify}
+            />
+          )}
+
           {activeSubTab === "polls" && (
             <PollManager
               config={config}
               onSavePoll={updatePoll}
               onSaveVolunteer={updateVolunteerSeva}
               onNotify={notify}
+              onSwitchTab={setActiveSubTab}
             />
           )}
 

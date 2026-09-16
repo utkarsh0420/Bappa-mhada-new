@@ -73,6 +73,20 @@ const receiptSchema = new mongoose.Schema(
       type: String,
       default: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
       trim: true
+    },
+    isArchived: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    archivedAt: {
+      type: Date,
+      default: null
+    },
+    archivedBy: {
+      type: String,
+      default: "",
+      trim: true
     }
   },
   {

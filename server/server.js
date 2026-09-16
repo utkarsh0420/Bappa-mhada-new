@@ -17,6 +17,7 @@ import eventRoutes from "./routes/eventRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import receiptRoutes from "./routes/receiptRoutes.js";
+import volunteerRoutes from "./routes/volunteerRoutes.js";
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.use("/api/contacts", contactRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/receipts", receiptRoutes);
+app.use("/api/volunteers", volunteerRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

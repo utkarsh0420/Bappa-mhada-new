@@ -78,10 +78,12 @@ const MainApp = () => {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Handle section hash on initial load (e.g. #schedule, #aarti)
+  // Handle section hash on initial load (e.g. #schedule, #aarti, #volunteer)
   useEffect(() => {
     const hash = window.location.hash.toLowerCase();
-    if (hash && hash !== "#admin" && hash.length > 1) {
+    if (hash === "#volunteer" || hash === "#seva") {
+      setIsVolunteerOpen(true);
+    } else if (hash && hash !== "#admin" && hash.length > 1) {
       const targetId = hash.replace("#", "");
       setTimeout(() => {
         const el = document.getElementById(targetId) || document.getElementById(`${targetId}-section`);
@@ -214,6 +216,7 @@ const MainApp = () => {
         onOpenAdminLogin={() => setIsAdminLoginModalOpen(true)}
         onOpenAdminDashboard={handleOpenAdminDashboard}
         onOpenUpcomingCalendar={handleOpenUpcomingCalendar}
+        onOpenVolunteer={() => setIsVolunteerOpen(true)}
       />
 
       {/* Main Public Festival Portal */}
