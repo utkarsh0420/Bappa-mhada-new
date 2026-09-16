@@ -949,7 +949,7 @@
       "targetAudienceEn": "All Wings (G, H, J, K)",
       "category": "cultural",
       "categoryEn": "cultural",
-      "eventType": "festival",
+      "eventType": "yearly",
       "titleMr": "२०२६-२०२७ मधील आगामी कार्यक्रमांची यादी",
       "titleEn": "Upcoming Events List 2026-2027",
       "startDate": "2026-09-16",
@@ -971,7 +971,8 @@
       "isHighlight": false,
       "imageUrl": "/uploads/WhatsApp_Image_2026-09-15_at_22_40_52-1789542957829-919637069.jpeg",
       "status": "upcoming",
-      "order": 0
+      "order": 0,
+      "updatedAt": "2026-09-16T20:31:17.432Z"
     },
     {
       "_id": "ev_1789543411107",
