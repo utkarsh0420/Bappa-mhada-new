@@ -28,7 +28,7 @@ const defaultInitialData = {
     {
       _id: "admin_society_mhada",
       email: "mhadatowersutsavmandal@gmail.com",
-      passwordHash: bcrypt.hashSync("MhadaGanpati@2025", 10),
+      passwordHash: bcrypt.hashSync("mhada@hig", 10),
       name: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
       role: "admin",
       createdAt: new Date().toISOString()
@@ -405,9 +405,15 @@ class LocalStore {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, "utf-8");
         this.data = JSON.parse(raw);
-        // Ensure admin user exists
-        if (!this.getUserByEmail("mhadatowersutsavmandal@gmail.com")) {
-          this.data.users.push(defaultInitialData.users[0]);
+        // Ensure only one admin user exists with password mhada@hig
+        const adminUser = this.getUserByEmail("mhadatowersutsavmandal@gmail.com");
+        if (!adminUser) {
+          this.data.users = [defaultInitialData.users[0]];
+          this.save();
+        } else {
+          adminUser.passwordHash = bcrypt.hashSync("mhada@hig", 10);
+          delete adminUser.password;
+          this.data.users = [adminUser];
           this.save();
         }
         if (!this.data.config.festivalScheduleCard) {

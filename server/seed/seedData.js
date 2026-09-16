@@ -6,20 +6,24 @@ import User from "../models/User.js";
 
 export const seedInitialData = async () => {
   try {
-    // 1. Seed Admin User
-    const existingAdmin = await User.findOne({ email: "mhadatowersutsavmandal@gmail.com" });
+    // 1. Seed Single Admin User
+    let existingAdmin = await User.findOne({ email: "mhadatowersutsavmandal@gmail.com" });
     if (!existingAdmin) {
       const admin = new User({
         email: "mhadatowersutsavmandal@gmail.com",
-        password: "MhadaGanpati@2025",
+        password: "mhada@hig",
         name: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
         role: "admin"
       });
       await admin.save();
-      console.log("[Seed] Admin user seeded: mhadatowersutsavmandal@gmail.com / MhadaGanpati@2025");
+      console.log("[Seed] Admin user seeded: mhadatowersutsavmandal@gmail.com / mhada@hig");
+    } else {
+      existingAdmin.password = "mhada@hig";
+      await existingAdmin.save();
+      console.log("[Seed] Admin user password updated to mhada@hig");
     }
-    // Clean up old admin email record if present
-    await User.deleteMany({ email: "mhadatowersutsav@gmail.com" });
+    // Clean up any other user records to ensure only one admin user exists
+    await User.deleteMany({ email: { $ne: "mhadatowersutsavmandal@gmail.com" } });
 
     // Official 12 Committee Members
     const officialCommitteeMembers = [

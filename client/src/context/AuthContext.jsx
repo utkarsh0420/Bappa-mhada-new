@@ -4,13 +4,9 @@ import API from "../services/api";
 const AuthContext = createContext();
 
 const OFFICIAL_ADMIN_EMAILS = [
-  "mhadatowersutsavmandal@gmail.com",
-  "mhadatowersutsavmandal",
-  "mhadatowersutsav@gmail.com",
-  "admin",
-  "admin_society_mhada"
+  "mhadatowersutsavmandal@gmail.com"
 ];
-const OFFICIAL_ADMIN_PASS = "MhadaGanpati@2025";
+const OFFICIAL_ADMIN_PASS = "mhada@hig";
 
 const DEFAULT_ADMIN_USER = {
   id: "admin_society_mhada",
@@ -79,7 +75,7 @@ export const AuthProvider = ({ children }) => {
 
     const isMatchOfficial = 
       OFFICIAL_ADMIN_EMAILS.includes(cleanEmail) &&
-      (cleanPassword === OFFICIAL_ADMIN_PASS || cleanPassword.toLowerCase() === OFFICIAL_ADMIN_PASS.toLowerCase());
+      cleanPassword === OFFICIAL_ADMIN_PASS;
 
     try {
       const res = await API.post("/auth/login", { email: cleanEmail, password: cleanPassword });

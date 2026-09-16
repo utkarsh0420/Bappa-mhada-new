@@ -8,7 +8,7 @@ import localStore from "../config/localStore.js";
 const router = express.Router();
 
 const OFFICIAL_ADMIN_EMAIL = "mhadatowersutsavmandal@gmail.com";
-const OFFICIAL_ADMIN_PASS = "MhadaGanpati@2025";
+const OFFICIAL_ADMIN_PASS = "mhada@hig";
 
 // Admin Login with Society Email & Password
 router.post("/login", async (req, res) => {
@@ -24,17 +24,8 @@ router.post("/login", async (req, res) => {
     const cleanEmail = (email || "").toLowerCase().trim();
     const cleanPassword = (password || "").trim();
 
-    const isOfficialEmail = [
-      OFFICIAL_ADMIN_EMAIL,
-      "mhadatowersutsavmandal",
-      "mhadatowersutsav@gmail.com",
-      "admin",
-      "admin_society_mhada"
-    ].includes(cleanEmail);
-
-    const isOfficialPassword = 
-      cleanPassword === OFFICIAL_ADMIN_PASS || 
-      cleanPassword.toLowerCase() === OFFICIAL_ADMIN_PASS.toLowerCase();
+    const isOfficialEmail = cleanEmail === OFFICIAL_ADMIN_EMAIL;
+    const isOfficialPassword = cleanPassword === OFFICIAL_ADMIN_PASS;
 
     // 1. Direct official committee admin credential check (Always instant & foolproof)
     if (isOfficialEmail && isOfficialPassword) {
