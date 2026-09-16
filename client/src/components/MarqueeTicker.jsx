@@ -4,59 +4,87 @@ import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { getAllWingsLabel } from "../utils/wingUtils";
 
+const DEFAULT_MESSAGES = [
+  {
+    id: "msg_1",
+    text: "7:30 PM. Kindly arrive 10 minutes earlier.",
+    textMr: "संध्या. ७:३० वाजता. कृपया १० मिनिटे आधी यावे.",
+    textEn: "7:30 PM. Kindly arrive 10 minutes earlier.",
+    isActive: true,
+    order: 1
+  },
+  {
+    id: "msg_2",
+    text: "All 5 Buildings (G • H • J • K • I) • MHADA Towers",
+    textMr: "सर्व ५ इमारती (G • H • J • K • I) • म्हाडा टॉवर्स",
+    textEn: "All 5 Buildings (G • H • J • K • I) • MHADA Towers",
+    isActive: true,
+    order: 2
+  },
+  {
+    id: "msg_3",
+    text: "Daily Maha Aarti: 08:30 AM & 08:00 PM",
+    textMr: "दैनिक महाआरती: सकाळी ८:३० व रात्री ८:०० वाजता",
+    textEn: "Daily Maha Aarti: 08:30 AM & 08:00 PM",
+    isActive: true,
+    order: 3
+  },
+  {
+    id: "msg_4",
+    text: "Shree Ganeshotsav 2026 • Digital Information Center",
+    textMr: "श्री गणेशोत्सव २०२६ • डिजिटल माहिती केंद्र",
+    textEn: "Shree Ganeshotsav 2026 • Digital Information Center",
+    isActive: true,
+    order: 4
+  }
+];
+
 const MarqueeTicker = ({ latestAnnouncement, onSelectAnnouncement, onOpenSidebar }) => {
   const { config } = useConfig();
   const { language } = useLanguage();
 
-  if (!config?.marqueeActive && !latestAnnouncement) return null;
+  // If master scroller is turned OFF by admin, hide completely (no empty blank bar)
+  if (config?.marqueeActive === false) return null;
 
-  const adminMarquee = config?.marqueeText?.trim();
-  const noticeTitle = language === "mr" 
-    ? latestAnnouncement?.titleMr 
-    : (latestAnnouncement?.titleEn || latestAnnouncement?.titleMr);
-  const noticeDesc = language === "mr"
-    ? latestAnnouncement?.descriptionMr
-    : (latestAnnouncement?.descriptionEn || latestAnnouncement?.descriptionMr);
+  // Retrieve messages from backend config or fallback to seed defaults
+  const allMessages = Array.isArray(config?.scrollerMessages) && config.scrollerMessages.length > 0
+    ? config.scrollerMessages
+    : DEFAULT_MESSAGES;
 
-  const noticeMarquee = noticeTitle
-    ? `${noticeTitle} — ${noticeDesc || ""}`
-    : null;
+  // Filter active messages including optional start/end scheduling
+  const now = Date.now();
+  const activeMessages = allMessages
+    .filter(msg => {
+      if (!msg.isActive) return false;
+      if (msg.startDate) {
+        const start = new Date(msg.startDate).getTime();
+        if (!isNaN(start) && now < start) return false;
+      }
+      if (msg.endDate) {
+        const end = new Date(msg.endDate).getTime();
+        if (!isNaN(end) && now > end) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
-  const wingsLabel = getAllWingsLabel(config, language);
-
-  const defaultText = language === "mr"
-    ? `गणपती बाप्पा मोरया! दैनिक महाआरती सकाळी ८:३० व रात्री ८:०० वाजता | महाप्रसाद वाटप ५व्या दिवशी दुपारी १२:३० पासून सुरु | ${wingsLabel} मधील भाविकांनी उपस्थित राहावे.`
-    : `Ganpati Bappa Morya! Daily Maha Aarti at 08:30 AM & 08:00 PM | Mahaprasad on Day 5 from 12:30 PM | All residents of ${wingsLabel} are cordially invited.`;
-
-  const primaryText = adminMarquee || noticeMarquee || defaultText;
-  const secondaryText = adminMarquee && noticeMarquee 
-    ? noticeMarquee 
-    : (language === "mr" ? "श्री गणेशोत्सव २०२६ • डिजिटल माहिती केंद्र" : "Shree Ganeshotsav 2026 • Digital Information Center");
+  // If no messages are active, do not render an empty bar
+  if (activeMessages.length === 0) return null;
 
   // Render content items helper so Track 1 and Track 2 are 100% mathematically identical
-  const renderTickerContent = () => (
+  const renderTickerContent = (keyPrefix = "track") => (
     <div className="flex shrink-0 items-center gap-4 sm:gap-6 pr-4 sm:pr-6 whitespace-nowrap text-xs sm:text-sm font-medium text-gold-100">
-      <span className="hover:text-gold-300 transition-colors font-semibold">{primaryText}</span>
-      <span className="text-gold-400/80">❖</span>
-      <span className="text-festive-saffron font-semibold">
-        {wingsLabel} • {language === "mr" ? "म्हाडा टॉवर्स" : "MHADA Towers"}
-      </span>
-      <span className="text-gold-400/80">❖</span>
-      {noticeMarquee && adminMarquee ? (
-        <>
-          <span className="text-amber-200 hover:text-white transition-colors">📢 {noticeMarquee}</span>
-          <span className="text-gold-400/80">❖</span>
-        </>
-      ) : (
-        <>
-          <span className="text-amber-200">
-            {language === "mr" ? "दैनिक महाआरती: सकाळी ८:३० व रात्री ८:०० वाजता" : "Daily Maha Aarti: 08:30 AM & 08:00 PM"}
-          </span>
-          <span className="text-gold-400/80">❖</span>
-        </>
-      )}
-      <span className="text-gold-200 font-semibold">{secondaryText}</span>
-      <span className="text-gold-400/80">❖</span>
+      {activeMessages.map((msg, idx) => {
+        const displayText = language === "mr" 
+          ? (msg.textMr || msg.text) 
+          : (msg.textEn || msg.text);
+        return (
+          <React.Fragment key={`${keyPrefix}_${msg.id || idx}`}>
+            <span className="hover:text-gold-300 transition-colors font-semibold">{displayText}</span>
+            <span className="text-gold-400/80">❖</span>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 
@@ -84,9 +112,9 @@ const MarqueeTicker = ({ latestAnnouncement, onSelectAnnouncement, onOpenSidebar
           {/* Seamless infinite double-track with hardware accelerated CSS animation */}
           <div className="flex w-max animate-marquee-continuous group-hover:[animation-play-state:paused]">
             {/* Track 1 */}
-            {renderTickerContent()}
+            {renderTickerContent("track1")}
             {/* Track 2 (exact clone for 100% seamless infinite loop with zero jump cuts) */}
-            {renderTickerContent()}
+            {renderTickerContent("track2")}
           </div>
         </div>
 

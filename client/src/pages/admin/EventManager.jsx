@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { 
   Plus, Trash2, Calendar, Clock, MapPin, 
   Building2, Sparkles, Tag, Flame, Edit2, X, Check, Globe,
-  Upload, Image as ImageIcon, Download, FolderUp, Camera, Eye, Loader2, Share2
+  Upload, Image as ImageIcon, Download, FolderUp, Camera, Eye, Loader2, Share2,
+  Users, CheckCircle2, AlertCircle
 } from "lucide-react";
 import API from "../../services/api";
 import { 
@@ -14,9 +15,9 @@ import { formatEventsScheduleBroadcast, formatSingleEvent, openWhatsApp } from "
 import { triggerLiveSync } from "../../utils/liveSync";
 
 const EVENT_CATEGORIES_MR = [
-  { value: "aarti", label: "दैनिक आरती (Aarti)" },
-  { value: "arrival", label: "श्रींचे आगमन (Arrival)" },
   { value: "cultural", label: "सांस्कृतिक कार्यक्रम (Cultural)" },
+  { value: "arrival", label: "श्रींचे आगमन (Arrival)" },
+  { value: "aarti", label: "दैनिक आरती (Aarti)" },
   { value: "prasad", label: "महाप्रसाद (Maha Prasad)" },
   { value: "visarjan", label: "विसर्जन (Visarjan)" },
   { value: "competition", label: "स्पर्धा व खेळ (Competition)" },
@@ -25,9 +26,9 @@ const EVENT_CATEGORIES_MR = [
 ];
 
 const EVENT_CATEGORIES_EN = [
-  { value: "aarti", label: "Daily Aarti" },
-  { value: "arrival", label: "Lord's Arrival & Sthapana" },
   { value: "cultural", label: "Cultural Event" },
+  { value: "arrival", label: "Lord's Arrival & Sthapana" },
+  { value: "aarti", label: "Daily Aarti" },
   { value: "prasad", label: "Mahaprasad Feast" },
   { value: "visarjan", label: "Visarjan Immersion" },
   { value: "competition", label: "Sports & Contests" },
@@ -64,6 +65,34 @@ const compressImageFile = (file, maxWidth = 1000, quality = 0.75) => {
   });
 };
 
+const DEFAULT_FORM_STATE = {
+  eventType: "festival", // "festival" or "yearly"
+  category: "cultural",
+  categoryEn: "",
+  titleMr: "",
+  titleEn: "",
+  startDate: "2026-09-16",
+  startTime: "16:00",
+  endDate: "2026-09-16",
+  endTime: "20:00",
+  time: "",
+  dateStr: "",
+  dateStrEn: "",
+  dayNumber: 1,
+  venue: "मुख्य मंडप, म्हाडा टॉवर्स",
+  venueEn: "Main Pandal, MHADA Towers",
+  hostWing: "सर्व विंग्ज (G, H, J, K)",
+  hostWingEn: "All Wings (G, H, J, K)",
+  targetAudience: "सर्व विंग्ज (G, H, J, K)",
+  targetAudienceEn: "All Wings (G, H, J, K)",
+  descriptionMr: "",
+  descriptionEn: "",
+  status: "upcoming",
+  imageUrl: "",
+  isHighlight: false,
+  isPublished: true
+};
+
 const EventManager = ({ events, onRefresh, onNotify, config }) => {
   const { language } = useLanguage();
   const isEn = language === "en";
@@ -71,77 +100,44 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [previewModalImg, setPreviewModalImg] = useState(null);
-
-  const [form, setForm] = useState({
-    eventType: "festival", // "festival" or "yearly"
-    category: "cultural",
-    categoryEn: "",
-    titleMr: "",
-    titleEn: "",
-    time: "",
-    dateStr: "दररोज",
-    dateStrEn: "",
-    dayNumber: 1,
-    venue: "मुख्य मंडप, म्हाडा टॉवर्स",
-    venueEn: "Main Pandal, MHADA Towers",
-    hostWing: "सर्व विंग्ज (G, H, J, K)",
-    hostWingEn: "All Wings (G, H, J, K)",
-    descriptionMr: "",
-    descriptionEn: "",
-    status: "upcoming",
-    imageUrl: "",
-    isHighlight: false
-  });
-
+  const [form, setForm] = useState(DEFAULT_FORM_STATE);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const handleStartEdit = (ev) => {
-    setEditingId(ev._id);
+    setEditingId(ev._id || ev.id);
     setForm({
       eventType: ev.eventType || "festival",
       category: ev.category || "cultural",
       categoryEn: ev.categoryEn || "",
       titleMr: ev.titleMr || "",
       titleEn: ev.titleEn || "",
+      startDate: ev.startDate || (ev.startDateTime ? new Date(ev.startDateTime).toISOString().slice(0, 10) : ""),
+      startTime: ev.startTime || "",
+      endDate: ev.endDate || (ev.endDateTime ? new Date(ev.endDateTime).toISOString().slice(0, 10) : ""),
+      endTime: ev.endTime || "",
       time: ev.time || "",
       dateStr: ev.dateStr || "",
       dateStrEn: ev.dateStrEn || "",
       dayNumber: ev.dayNumber || 1,
       venue: ev.venue || "मुख्य मंडप, म्हाडा टॉवर्स",
       venueEn: ev.venueEn || "Main Pandal, MHADA Towers",
-      hostWing: ev.hostWing || "सर्व विंग्ज (G, H, J, K)",
-      hostWingEn: ev.hostWingEn || "All Wings (G, H, J, K)",
+      hostWing: ev.hostWing || ev.targetAudience || "सर्व विंग्ज (G, H, J, K)",
+      hostWingEn: ev.hostWingEn || ev.targetAudienceEn || "All Wings (G, H, J, K)",
+      targetAudience: ev.targetAudience || ev.hostWing || "सर्व विंग्ज (G, H, J, K)",
+      targetAudienceEn: ev.targetAudienceEn || ev.hostWingEn || "All Wings (G, H, J, K)",
       descriptionMr: ev.descriptionMr || "",
       descriptionEn: ev.descriptionEn || "",
       status: ev.status || "upcoming",
       imageUrl: ev.imageUrl || "",
-      isHighlight: Boolean(ev.isHighlight)
+      isHighlight: Boolean(ev.isHighlight),
+      isPublished: ev.isPublished !== false
     });
     window.scrollTo({ top: 180, behavior: "smooth" });
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setForm({
-      eventType: "festival",
-      category: "cultural",
-      categoryEn: "",
-      titleMr: "",
-      titleEn: "",
-      time: "",
-      dateStr: "दररोज",
-      dateStrEn: "",
-      dayNumber: 1,
-      venue: "मुख्य मंडप, म्हाडा टॉवर्स",
-      venueEn: "Main Pandal, MHADA Towers",
-      hostWing: "सर्व विंग्ज (G, H, J, K)",
-      hostWingEn: "All Wings (G, H, J, K)",
-      descriptionMr: "",
-      descriptionEn: "",
-      status: "upcoming",
-      imageUrl: "",
-      isHighlight: false
-    });
+    setForm(DEFAULT_FORM_STATE);
   };
 
   // Upload image to server/uploads/
@@ -150,6 +146,10 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       onNotify(isEn ? "Please select an image file (JPG, PNG, WebP)" : "कृपया वैध फोटो फाइल निवडा (JPG, PNG, WebP)", "error");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      onNotify(isEn ? "Image exceeds 20MB limit" : "फोटो २०MB पेक्षा लहान असावा", "error");
       return;
     }
 
@@ -165,13 +165,13 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
 
       if (res.data?.success && res.data.imageUrl) {
         setForm(prev => ({ ...prev, imageUrl: res.data.imageUrl }));
-        onNotify(isEn ? "Photo uploaded to server uploads folder!" : "फोटो सर्व्हरवर (server/uploads/) यशस्वीरित्या अपलोड झाला!", "success");
+        onNotify(isEn ? "Photo uploaded successfully!" : "फोटो यशस्वीरित्या सर्व्हरवर अपलोड झाला!", "success");
       } else {
         throw new Error(res.data?.message || "Upload failed");
       }
     } catch (err) {
       console.error("Image upload error:", err);
-      // Fallback to local compression if server encounters error
+      // Fallback to local compression if server encountered error
       try {
         const compressed = await compressImageFile(file);
         setForm(prev => ({ ...prev, imageUrl: compressed }));
@@ -203,7 +203,7 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
             const headers = lines[0].split(",").map(h => h.trim().replace(/^["']|["']$/g, ""));
             for (let i = 1; i < lines.length; i++) {
               const cols = lines[i].split(",").map(c => c.trim().replace(/^["']|["']$/g, ""));
-              if (cols.length >= 3) {
+              if (cols.length >= 2) {
                 const item = {};
                 headers.forEach((h, idx) => {
                   item[h] = cols[idx] || "";
@@ -221,7 +221,7 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
 
         const res = await API.post("/events/bulk", { events: parsedEvents });
         if (res.data?.success) {
-          onNotify(isEn ? `Successfully imported ${res.data.count} events from device!` : `${res.data.count} कार्यक्रम फाइलमधून यशस्वीरीत्या आयात केले!`, "success");
+          onNotify(isEn ? `Successfully imported ${res.data.count} events!` : `${res.data.count} कार्यक्रम फाइलमधून यशस्वीरीत्या आयात केले!`, "success");
           onRefresh();
           triggerLiveSync("events");
         }
@@ -253,8 +253,18 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.titleMr) {
-      onNotify(isEn ? "Please enter Marathi title" : "कार्यक्रमाचे शीर्षक आवश्यक आहे", "error");
+    if (!form.titleMr && !form.titleEn) {
+      onNotify(isEn ? "Please enter Event Title" : "कार्यक्रमाचे शीर्षक आवश्यक आहे", "error");
+      return;
+    }
+
+    if (!form.startDate && !form.dateStr) {
+      onNotify(isEn ? "Please provide Event Date" : "कार्यक्रमाची तारीख आवश्यक आहे", "error");
+      return;
+    }
+
+    if (form.startDate && form.endDate && form.endDate < form.startDate) {
+      onNotify(isEn ? "End date must be after start date" : "समाप्ती दिनांक प्रारंभ दिनांकापेक्षा पुढे असावा", "error");
       return;
     }
 
@@ -264,63 +274,57 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
         eventType: form.eventType,
         category: form.category,
         categoryEn: form.categoryEn || form.category,
-        titleMr: form.titleMr,
+        titleMr: form.titleMr || form.titleEn,
         titleEn: form.titleEn || form.titleMr,
+        startDate: form.startDate,
+        startTime: form.startTime,
+        endDate: form.endDate || form.startDate,
+        endTime: form.endTime,
         time: form.time,
         dateStr: form.dateStr,
         dateStrEn: form.dateStrEn || form.dateStr,
         dayNumber: Number(form.dayNumber) || 1,
         venue: form.venue,
         venueEn: form.venueEn || form.venue,
-        hostWing: form.hostWing,
-        hostWingEn: form.hostWingEn || form.hostWing,
+        hostWing: form.hostWing || form.targetAudience,
+        hostWingEn: form.hostWingEn || form.targetAudienceEn || form.hostWing,
+        targetAudience: form.targetAudience || form.hostWing,
+        targetAudienceEn: form.targetAudienceEn || form.hostWingEn || form.targetAudience,
         descriptionMr: form.descriptionMr,
         descriptionEn: form.descriptionEn || form.descriptionMr,
         status: form.status,
         imageUrl: form.imageUrl || "",
-        isHighlight: form.isHighlight
+        isHighlight: Boolean(form.isHighlight),
+        isPublished: form.isPublished !== false
       };
 
       if (editingId) {
         const res = await API.put(`/events/${editingId}`, payload);
-        setIsSubmitting(false);
-        if (res.data.success) {
+        if (res.data?.success) {
           onNotify(isEn ? "Event updated successfully!" : "कार्यक्रम यशस्वीरीत्या अद्ययावत केला!", "success");
           handleCancelEdit();
           onRefresh();
           triggerLiveSync("events");
+        } else {
+          throw new Error(res.data?.message || "Failed to update event");
         }
       } else {
         const res = await API.post("/events", payload);
-        setIsSubmitting(false);
-        if (res.data.success) {
+        if (res.data?.success) {
           onNotify(isEn ? "New event added to calendar!" : "नवीन कार्यक्रम दिनदर्शिकेत जोडला!", "success");
-          setForm({
-            eventType: "festival",
-            category: "cultural",
-            categoryEn: "",
-            titleMr: "",
-            titleEn: "",
-            time: "",
-            dateStr: "दररोज",
-            dateStrEn: "",
-            dayNumber: 1,
-            venue: "मुख्य मंडप, म्हाडा टॉवर्स",
-            venueEn: "Main Pandal, MHADA Towers",
-            hostWing: "सर्व विंग्ज (G, H, J, K)",
-            hostWingEn: "All Wings (G, H, J, K)",
-            descriptionMr: "",
-            descriptionEn: "",
-            status: "upcoming",
-            isHighlight: false
-          });
+          handleCancelEdit();
           onRefresh();
           triggerLiveSync("events");
+        } else {
+          throw new Error(res.data?.message || "Failed to add event");
         }
       }
     } catch (err) {
+      console.error("Save event error:", err);
+      const errorMsg = err.response?.data?.message || err.message || (isEn ? "Error saving event" : "कार्यक्रम जतन करताना त्रुटी आली");
+      onNotify(errorMsg, "error");
+    } finally {
       setIsSubmitting(false);
-      onNotify(editingId ? (isEn ? "Error updating event" : "कार्यक्रम अद्ययावत करताना त्रुटी आली") : (isEn ? "Error adding event" : "कार्यक्रम जोडताना त्रुटी आली"), "error");
     }
   };
 
@@ -328,11 +332,13 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
     if (!window.confirm(isEn ? "Are you sure you want to delete this event?" : "हा कार्यक्रम नक्की हटवायचा आहे का?")) return;
     try {
       const res = await API.delete(`/events/${id}`);
-      if (res.data.success) {
+      if (res.data?.success) {
         onNotify(isEn ? "Event removed from calendar" : "कार्यक्रम हटवला गेला", "success");
         if (editingId === id) handleCancelEdit();
         onRefresh();
         triggerLiveSync("events");
+      } else {
+        throw new Error(res.data?.message || "Failed to delete");
       }
     } catch (err) {
       onNotify(isEn ? "Failed to delete event" : "हटवताना त्रुटी आली", "error");
@@ -464,9 +470,9 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value })}
             >
-              <option value="upcoming">{isEn ? "Upcoming" : "आगामी (Upcoming)"}</option>
-              <option value="live">{isEn ? "Live / Ongoing" : "सध्या सुरू आहे (Live / Ongoing)"}</option>
-              <option value="completed">{isEn ? "Completed" : "संपन्न झाले (Completed)"}</option>
+              <option value="upcoming">{isEn ? "Upcoming (Starts in...)" : "आगामी (Upcoming)"}</option>
+              <option value="live">{isEn ? "Live / Ongoing (Ends in...)" : "सध्या सुरू आहे (Live / Ongoing)"}</option>
+              <option value="completed">{isEn ? "Completed (Event Ended)" : "संपन्न झाले (Completed)"}</option>
             </FestiveSelect>
           </div>
 
@@ -489,24 +495,88 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
             />
           </div>
 
-          {/* Date, Time, Day Number */}
+          {/* Start Date, Start Time, End Date, End Time (Structured for IST Timer) */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 p-3.5 bg-[#FAF5EB]/70 rounded-2xl border border-gold-300">
+            <div>
+              <label className="block text-xs font-bold text-maroon-950 mb-1 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                <span>{isEn ? "Start Date *" : "प्रारंभ दिनांक *"}</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={form.startDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm(prev => ({
+                    ...prev,
+                    startDate: val,
+                    endDate: (!prev.endDate || prev.endDate < val) ? val : prev.endDate
+                  }));
+                }}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-gold-300 text-xs font-bold text-maroon-950 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-maroon-950 mb-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                <span>{isEn ? "Start Time *" : "प्रारंभ वेळ *"}</span>
+              </label>
+              <input
+                type="time"
+                value={form.startTime}
+                onChange={(e) => setForm(prev => ({ ...prev, startTime: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-gold-300 text-xs font-bold text-maroon-950 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-maroon-950 mb-1 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                <span>{isEn ? "End Date" : "समाप्ती दिनांक"}</span>
+              </label>
+              <input
+                type="date"
+                value={form.endDate}
+                min={form.startDate}
+                onChange={(e) => setForm(prev => ({ ...prev, endDate: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-gold-300 text-xs font-bold text-maroon-950 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-maroon-950 mb-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                <span>{isEn ? "End Time" : "समाप्ती वेळ"}</span>
+              </label>
+              <input
+                type="time"
+                value={form.endTime}
+                onChange={(e) => setForm(prev => ({ ...prev, endTime: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-gold-300 text-xs font-bold text-maroon-950 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Custom Display Date Strings, Time & Day Number */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <FestiveInput
-              label={isEn ? "Time (e.g. 08:30 AM)" : "वेळ (Time)"}
+              label={isEn ? "Custom Display Time (Optional)" : "दर्शनी वेळ (पर्यायी)"}
               icon={Clock}
               value={form.time}
               onChange={(e) => setForm({ ...form, time: e.target.value })}
-              placeholder={isEn ? "e.g. 08:30 AM / 08:00 PM" : "उदा. सकाळी ०८:३० / रात्री ०८:००"}
+              placeholder={isEn ? "Auto-generated from Start/End Time if empty" : "रिकामी ठेवल्यास वेळेनुसार स्वयंचलित तयार होईल"}
             />
             <FestiveInput
-              label={isEn ? "Date / Period (Marathi)" : "दिनांक किंवा कालावधी (मराठी)"}
+              label={isEn ? "Display Date / Period (Marathi)" : "दिनांक / कालावधी (मराठी)"}
               icon={Calendar}
               value={form.dateStr}
               onChange={(e) => setForm({ ...form, dateStr: e.target.value })}
               placeholder="उदा. ७ सप्टेंबर किंवा दररोज"
             />
             <FestiveInput
-              label={isEn ? "Date / Period (English)" : "दिनांक / कालावधी (English)"}
+              label={isEn ? "Display Date / Period (English)" : "दिनांक / कालावधी (English)"}
               icon={Globe}
               value={form.dateStrEn}
               onChange={(e) => setForm({ ...form, dateStrEn: e.target.value })}
@@ -514,34 +584,35 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
             />
           </div>
 
-          {/* Host Wing & Venue */}
+          {/* Host Wing & Target Audience */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FestiveInput
-              label={isEn ? "Host Wing (Marathi)" : "यजमान विंग (मराठी)"}
+              label={isEn ? "Target Audience / Host Wing (Marathi)" : "लक्षित रहिवासी / यजमान विंग (मराठी)"}
               icon={Building2}
               value={form.hostWing}
-              onChange={(e) => setForm({ ...form, hostWing: e.target.value })}
-              placeholder="उदा. G WING - नंदादेवी / सर्व विंग्ज"
+              onChange={(e) => setForm({ ...form, hostWing: e.target.value, targetAudience: e.target.value })}
+              placeholder="उदा. सर्व विंग्ज (G, H, J, K) / महिला मंडळ / लहान मुले"
             />
             <FestiveInput
-              label={isEn ? "Host Wing (English)" : "Host Wing (English)"}
+              label={isEn ? "Target Audience / Host Wing (English)" : "Target Audience / Host Wing (English)"}
               icon={Globe}
               value={form.hostWingEn}
-              onChange={(e) => setForm({ ...form, hostWingEn: e.target.value })}
-              placeholder="e.g. G Wing - Nandadevi / All Wings"
+              onChange={(e) => setForm({ ...form, hostWingEn: e.target.value, targetAudienceEn: e.target.value })}
+              placeholder="e.g. All Wings (G, H, J, K) / Kids / Women"
             />
           </div>
 
+          {/* Venue / Location */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FestiveInput
-              label={isEn ? "Venue (Marathi)" : "स्थळ (मराठी)"}
+              label={isEn ? "Venue / Location (Marathi)" : "स्थळ / ठिकाण (मराठी)"}
               icon={MapPin}
               value={form.venue}
               onChange={(e) => setForm({ ...form, venue: e.target.value })}
               placeholder="उदा. मुख्य उत्सव मंडप, म्हाडा टॉवर्स"
             />
             <FestiveInput
-              label={isEn ? "Venue (English)" : "Venue (English)"}
+              label={isEn ? "Venue / Location (English)" : "Venue / Location (English)"}
               icon={Globe}
               value={form.venueEn}
               onChange={(e) => setForm({ ...form, venueEn: e.target.value })}
@@ -556,14 +627,14 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
               rows={2}
               value={form.descriptionMr}
               onChange={(e) => setForm({ ...form, descriptionMr: e.target.value })}
-              placeholder="कार्यक्रमाची रूपरेषा येथे लिहा..."
+              placeholder="कार्यक्रमाची रूपरेषा, नियम किंवा वयोगट येथे लिहा..."
             />
             <FestiveTextarea
               label={isEn ? "Description (English)" : "Detailed Description (English)"}
               rows={2}
               value={form.descriptionEn}
               onChange={(e) => setForm({ ...form, descriptionEn: e.target.value })}
-              placeholder="Event description in English..."
+              placeholder="Event description, rules, eligibility..."
             />
           </div>
 
@@ -621,7 +692,7 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
                       <span className="text-[11px] font-bold text-maroon-900 leading-tight">
                         {isEn ? "Select Photo / Poster" : "डिव्हाइसवरून फोटो निवडा"}
                       </span>
-                      <span className="text-[9px] text-stone-500 mt-0.5">JPG, PNG, WebP</span>
+                      <span className="text-[9px] text-stone-500 mt-0.5">JPG, PNG, WebP (Max 20MB)</span>
                     </>
                   )}
                   <input
@@ -637,38 +708,64 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
               <div className="flex-1 min-w-0 space-y-1.5 w-full">
                 <p className="text-[11px] text-stone-600 font-medium leading-relaxed">
                   {isEn 
-                    ? "Upload an official flyer, invitation, or photo from your computer or phone. It will automatically compress and display in the calendar." 
-                    : "आपल्या संगणक किंवा मोबाईलवरून कार्यक्रमाचे निमंत्रण पत्रिका, पोस्टर किंवा छायाचित्र निवडा. ते स्वयंचलितरीत्या ऑप्टिमाइझ होऊन कॅलेंडरमध्ये दिसेल."}
+                    ? "Upload an official flyer, invitation, or photo. It will automatically upload to the server and appear in the upcoming events popup/card." 
+                    : "आपल्या संगणक किंवा मोबाईलवरून कार्यक्रमाचे निमंत्रण पत्रिका, पोस्टर किंवा छायाचित्र निवडा. ते सर्व्हरवर सेव्ह होऊन आगामी कार्यक्रमाच्या पॉप-अपमध्ये दिसेल."}
                 </p>
                 {form.imageUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setForm(prev => ({ ...prev, imageUrl: "" }))}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 transition"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>{isEn ? "Remove photo" : "फोटो काढून टाका"}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewModalImg(form.imageUrl)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 hover:text-amber-950 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-300 transition"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>{isEn ? "Preview Photo" : "फोटो पहा"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, imageUrl: "" }))}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>{isEn ? "Remove photo" : "फोटो काढून टाका"}</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Highlight toggle */}
-          <div className="p-3.5 bg-gradient-to-r from-amber-50 to-[#FFFDF9] rounded-2xl border border-gold-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <FestiveToggle
-              checked={form.isHighlight}
-              onChange={(val) => setForm({ ...form, isHighlight: val })}
-              label={isEn ? "Special Attraction / Highlight" : "विशेष आकर्षण (Highlight Event)"}
-              sublabel={isEn ? "Give this event special prominence in the schedule" : "या कार्यक्रमाला वेळापत्रकात विशेष प्राधान्य व हायलाइट बॅज मिळेल"}
-              activeText={isEn ? "YES" : "होय"}
-              inactiveText={isEn ? "NO" : "नाही"}
-            />
-            {form.isHighlight && (
-              <FestiveBadge variant="gold" icon={Sparkles} className="self-start sm:self-auto">
-                {isEn ? "Highlight Active" : "विशेष आकर्षण"}
+          {/* Highlight & Published Visibility Controls */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-[#FFFDF9] rounded-2xl border border-gold-300">
+            <div className="flex items-center justify-between">
+              <FestiveToggle
+                checked={form.isHighlight}
+                onChange={(val) => setForm({ ...form, isHighlight: val })}
+                label={isEn ? "Special Attraction / Highlight" : "विशेष आकर्षण (Highlight Event)"}
+                sublabel={isEn ? "Give prominent highlight badge" : "कार्यक्रमाला विशेष हायलाइट बॅज मिळेल"}
+                activeText={isEn ? "YES" : "होय"}
+                inactiveText={isEn ? "NO" : "नाही"}
+              />
+              {form.isHighlight && (
+                <FestiveBadge variant="gold" icon={Sparkles}>
+                  {isEn ? "Highlight Active" : "विशेष आकर्षण"}
+                </FestiveBadge>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t sm:border-t-0 sm:border-l border-gold-200 pt-2 sm:pt-0 sm:pl-3">
+              <FestiveToggle
+                checked={form.isPublished}
+                onChange={(val) => setForm({ ...form, isPublished: val })}
+                label={isEn ? "Publish on Website" : "वेबसाईटवर प्रकाशित करा (Publish)"}
+                sublabel={isEn ? "Make visible on events page" : "कॅलेंडर व आगामी कार्यक्रमात दाखवा"}
+                activeText={isEn ? "PUBLISHED" : "सक्रिय / प्रकाशित"}
+                inactiveText={isEn ? "HIDDEN" : "अप्रकाशित"}
+              />
+              <FestiveBadge variant={form.isPublished ? "gold" : "maroon"}>
+                {form.isPublished ? (isEn ? "Live on Site" : "सक्रिय") : (isEn ? "Draft / Hidden" : "अप्रकाशित")}
               </FestiveBadge>
-            )}
+            </div>
           </div>
 
           {/* Form Submit & Cancel Buttons */}
@@ -691,10 +788,10 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
               variant="primary"
               size="md"
               className="w-full sm:w-auto"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingImage}
             >
               {isSubmitting 
-                ? (editingId ? (isEn ? "Saving..." : "बदल जतन करत आहे...") : (isEn ? "Saving..." : "जतन करत आहे...")) 
+                ? (editingId ? (isEn ? "Saving changes..." : "बदल जतन करत आहे...") : (isEn ? "Adding event..." : "कार्यक्रम जतन करत आहे...")) 
                 : (editingId ? (isEn ? "Save Changes" : "बदल जतन करा (Save Changes)") : (isEn ? "Save Event" : "कार्यक्रम जतन करा (Save Event)"))
               }
             </FestiveButton>
@@ -735,11 +832,11 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
         ) : (
           <div className="space-y-3">
             {events.map((ev) => {
-              const isCurrentEditing = editingId === ev._id;
+              const isCurrentEditing = editingId === (ev._id || ev.id);
 
               return (
                 <div
-                  key={ev._id}
+                  key={ev._id || ev.id}
                   className={`p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs ${
                     isCurrentEditing
                       ? "bg-amber-100/60 border-amber-500 ring-2 ring-amber-400/40"
@@ -774,12 +871,17 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
                             {isEn ? "Highlight" : "विशेष आकर्षण"}
                           </span>
                         )}
+                        {ev.isPublished === false && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-200 text-stone-700 border border-stone-300">
+                            {isEn ? "Hidden" : "अप्रकाशित"}
+                          </span>
+                        )}
                         <span className="text-xs font-bold text-maroon-900 bg-gold-100 px-2.5 py-0.5 rounded-lg border border-gold-300 flex items-center gap-1 whitespace-nowrap">
                           <Clock className="w-3 h-3 text-maroon-800 flex-shrink-0" />
-                          {ev.time}
+                          {ev.time || (ev.startTime ? `${ev.startTime} ${ev.endTime ? `- ${ev.endTime}` : ""}` : "")}
                         </span>
                         <span className="text-xs text-stone-500 font-medium whitespace-nowrap">
-                          • {isEn ? (ev.dateStrEn || ev.dateStr) : ev.dateStr}
+                          • {isEn ? (ev.dateStrEn || ev.dateStr || ev.startDate) : (ev.dateStr || ev.startDate)}
                         </span>
                       </div>
 
@@ -792,10 +894,10 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
                       </p>
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-600 font-medium">
-                        {(ev.hostWing || ev.hostWingEn) && (
+                        {(ev.hostWing || ev.hostWingEn || ev.targetAudience) && (
                           <span className="flex items-center gap-1 min-w-0">
                             <Building2 className="w-3.5 h-3.5 text-maroon-800 flex-shrink-0" />
-                            <span className="truncate">{isEn ? (ev.hostWingEn || ev.hostWing) : ev.hostWing}</span>
+                            <span className="truncate">{isEn ? (ev.hostWingEn || ev.targetAudienceEn || ev.hostWing) : (ev.hostWing || ev.targetAudience)}</span>
                           </span>
                         )}
                         {(ev.hostWing || ev.hostWingEn) && (ev.venue || ev.venueEn) && <span className="text-stone-300">•</span>}
@@ -837,7 +939,7 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
                     </FestiveButton>
 
                     <FestiveButton
-                      onClick={() => handleDelete(ev._id)}
+                      onClick={() => handleDelete(ev._id || ev.id)}
                       variant="danger"
                       size="sm"
                       icon={Trash2}

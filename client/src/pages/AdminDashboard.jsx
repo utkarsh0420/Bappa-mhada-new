@@ -3,7 +3,8 @@ import {
   ArrowLeft, ShieldCheck, Megaphone, Calendar, Phone, Settings, 
   Check, AlertTriangle, Menu, Flame, Sparkles, Building2, LogOut,
   SlidersHorizontal, LayoutDashboard, Newspaper, Image as ImageIcon,
-  FileText, BarChart2, Users, Info, Globe, MessageSquare, Send
+  FileText, BarChart2, Users, Info, Globe, MessageSquare, Send,
+  Receipt
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { useAuth } from "../context/AuthContext";
@@ -24,7 +25,9 @@ import ContactManager from "./admin/ContactManager";
 import MandalInfoManager from "./admin/MandalInfoManager";
 import SidebarManager from "./admin/SidebarManager";
 import GeneralSettings from "./admin/GeneralSettings";
+import ScrollerManager from "./admin/ScrollerManager";
 import WhatsAppBroadcastManager from "./admin/WhatsAppBroadcastManager";
+import ReceiptManager from "./admin/ReceiptManager";
 import { FestiveBadge, FestiveButton } from "./admin/FestiveControls";
 
 const AdminDashboard = ({ onClose }) => {
@@ -42,7 +45,8 @@ const AdminDashboard = ({ onClose }) => {
     updatePoll,
     updateVolunteerSeva,
     updateMandalInfo,
-    updateFestivalScheduleCard
+    updateFestivalScheduleCard,
+    updateScroller
   } = useConfig();
   const { admin, logout } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
@@ -138,9 +142,11 @@ const AdminDashboard = ({ onClose }) => {
   const subTabs = [
     { id: "tabs", label: language === "mr" ? "टॅब मान्यता" : "Tab Approvals", sublabel: language === "mr" ? "Tabs Approval" : "टॅब व्यवस्थापन", icon: ShieldCheck, badge: `${activeTabsCount}/${totalTabsCount}` },
     { id: "broadcast", label: language === "mr" ? "व्हॉट्सॲप ब्रॉडकास्ट" : "WhatsApp Broadcast", sublabel: language === "mr" ? "Broadcast" : "ब्रॉडकास्ट", icon: MessageSquare, badge: language === "mr" ? "थेट शेअर" : "Direct Share" },
+    { id: "receipts", label: language === "mr" ? "पावती जनरेटर" : "Receipt Generator", sublabel: language === "mr" ? "Receipts" : "पावती", icon: Receipt, badge: language === "mr" ? "नवीन" : "New" },
     { id: "newsletter", label: language === "mr" ? "दैनिक वृत्तपत्र" : "Daily Newsletter", sublabel: language === "mr" ? "Newsletter" : "वृत्तपत्र", icon: Newspaper },
     { id: "wings", label: language === "mr" ? "सहभागी इमारती" : "Participating Wings", sublabel: language === "mr" ? "Wings" : "विंग्स", icon: Building2, badge: config?.wings?.length || 4 },
     { id: "aartiSchedule", label: language === "mr" ? "वेळापत्रक, फोटो व आरती" : "Festival Schedule & Photo", sublabel: language === "mr" ? "Schedule & Photo" : "वेळापत्रक व फोटो", icon: Flame, badge: language === "mr" ? "फोटो व नियोजन" : "Photo & Event" },
+    { id: "scroller", label: language === "mr" ? "महत्वाचे अपडेट स्क्रोलर" : "Important Update Scroller", sublabel: language === "mr" ? "Scroller Ticker" : "स्क्रोलर व्यवस्थापन", icon: Megaphone, badge: config?.marqueeActive === false ? (language === "mr" ? "बंद (OFF)" : "OFF") : `${(config?.scrollerMessages || []).filter(m => m.isActive !== false).length} ${language === "mr" ? "सक्रिय" : "Active"}` },
     { id: "announcements", label: language === "mr" ? "महत्वाच्या सूचना" : "Announcements", sublabel: language === "mr" ? "Announcements" : "सूचना", icon: Megaphone, badge: announcements.length },
     { id: "events", label: language === "mr" ? "कार्यक्रम" : "Events Schedule", sublabel: language === "mr" ? "Events" : "कार्यक्रम", icon: Calendar, badge: events.length },
     { id: "gallery", label: language === "mr" ? "फोटो गॅलरी" : "Photo Gallery", sublabel: language === "mr" ? "Gallery" : "गॅलरी", icon: ImageIcon, badge: config?.gallery?.length || 0 },
@@ -149,7 +155,7 @@ const AdminDashboard = ({ onClose }) => {
     { id: "contacts", label: language === "mr" ? "विंग प्रतिनिधी व संपर्क" : "Wing Contacts", sublabel: language === "mr" ? "Contacts" : "संपर्क", icon: Phone, badge: contacts.length },
     { id: "mandalInfo", label: language === "mr" ? "मंडळ माहिती व कार्यकारणी" : "Mandal Info & Committee", sublabel: language === "mr" ? "Mandal Info" : "मंडळ माहिती", icon: Info },
     { id: "sidebar", label: language === "mr" ? "साइडबार नियंत्रण" : "Sidebar Control", sublabel: language === "mr" ? "Sidebar" : "साइडबार", icon: SlidersHorizontal },
-    { id: "general", label: language === "mr" ? "स्क्रोलर व सेटिंग्ज" : "Scroller & Settings", sublabel: language === "mr" ? "General Settings" : "सर्वसाधारण सेटिंग्ज", icon: Settings },
+    { id: "general", label: language === "mr" ? "सर्वसाधारण सेटिंग्ज" : "General Settings", sublabel: language === "mr" ? "General Settings" : "मंडळ सेटिंग्ज", icon: Settings },
   ];
 
   return (
@@ -438,6 +444,14 @@ const AdminDashboard = ({ onClose }) => {
             />
           )}
 
+          {activeSubTab === "scroller" && (
+            <ScrollerManager
+              config={config}
+              onSaveScroller={updateScroller}
+              onNotify={notify}
+            />
+          )}
+
           {activeSubTab === "announcements" && (
             <AnnouncementManager
               announcements={announcements}
@@ -505,10 +519,18 @@ const AdminDashboard = ({ onClose }) => {
             />
           )}
 
+          {activeSubTab === "receipts" && (
+            <ReceiptManager
+              config={config}
+              onNotify={notify}
+            />
+          )}
+
           {activeSubTab === "general" && (
             <GeneralSettings
               config={config}
               onSaveGeneral={handleSaveGeneral}
+              onSwitchTab={setActiveSubTab}
             />
           )}
         </div>

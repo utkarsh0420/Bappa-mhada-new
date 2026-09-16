@@ -3,7 +3,7 @@ import {
   Flame, Save, Calendar, Clock, Building2, 
   Sparkles, Check, CheckCircle2, Star, Globe, Info, Share2,
   Upload, Image as ImageIcon, Trash2, Eye, X, ChevronDown, ChevronUp,
-  Link as LinkIcon, Users
+  Link as LinkIcon, Users, Plus, ArrowUp, ArrowDown, Power, Edit3, Tag
 } from "lucide-react";
 import { 
   FestiveCard, FestiveInput, FestiveTextarea, FestiveButton, 
@@ -31,7 +31,75 @@ const AartiScheduleManager = ({
 
   const [schedule, setSchedule] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [showDailyAartiSection, setShowDailyAartiSection] = useState(false);
+  const [showDailyAartiSection, setShowDailyAartiSection] = useState(true);
+  const [isSectionEnabled, setIsSectionEnabled] = useState(true);
+  const [showSectionHeaders, setShowSectionHeaders] = useState(false);
+  const [sectionHeaders, setSectionHeaders] = useState({
+    badgeMr: "दैनिक महाआरती व यजमान",
+    badgeEn: "Daily Maha Aarti & Host Wings",
+    titleMr: "दैनिक महाआरती व विंग यजमान",
+    titleEn: "Daily Maha Aarti & Host Wings",
+    subtitleMr: "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती",
+    subtitleEn: "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal",
+    countdownLabelMr: "पुढील महाआरतीसाठी शिल्लक वेळ",
+    countdownLabelEn: "Time Remaining Until Next Aarti"
+  });
+
+  const normalizeDayForAdmin = (day, idx) => {
+    let events = Array.isArray(day.events) && day.events.length > 0 ? day.events : null;
+    if (!events) {
+      events = [
+        {
+          id: `evt_${day.dayNumber || idx + 1}_m`,
+          type: "morning",
+          categoryMr: "सकाळची महाआरती",
+          categoryEn: "Morning Maha Aarti",
+          titleMr: day.morningRitual || "मूर्ती प्राणप्रतिष्ठा पूजा व महाआरती",
+          titleEn: day.morningRitualEn || day.morningRitual || "Morning Maha Aarti",
+          time: day.morningTime || "सकाळी ०८:३० वाजता",
+          timeEn: day.morningTimeEn || "08:30 AM",
+          startTime: "08:30",
+          endTime: "09:30",
+          hostWing: day.hostWing || "सर्व इमारती संयुक्त",
+          hostWingEn: day.hostWingEn || "All Buildings Joint",
+          hostCoordinator: day.hostLead || "",
+          hostCoordinatorEn: day.hostLeadEn || "",
+          prasad: day.specialPrasad || "",
+          prasadEn: day.specialPrasadEn || "",
+          descriptionMr: "",
+          descriptionEn: "",
+          active: true
+        },
+        {
+          id: `evt_${day.dayNumber || idx + 1}_e`,
+          type: "evening",
+          categoryMr: "संध्याकाळची महाआरती",
+          categoryEn: "Evening Maha Aarti",
+          titleMr: day.eveningRitual || "धूपारती, अथर्वशीर्ष व महाआरती",
+          titleEn: day.eveningRitualEn || day.eveningRitual || "Evening Maha Aarti",
+          time: day.eveningTime || "रात्री ०८:०० वाजता",
+          timeEn: day.eveningTimeEn || "08:00 PM",
+          startTime: "20:00",
+          endTime: "21:00",
+          hostWing: day.hostWing || "सर्व इमारती संयुक्त",
+          hostWingEn: day.hostWingEn || "All Buildings Joint",
+          hostCoordinator: day.hostLead || "",
+          hostCoordinatorEn: day.hostLeadEn || "",
+          prasad: day.specialPrasad || "",
+          prasadEn: day.specialPrasadEn || "",
+          descriptionMr: "",
+          descriptionEn: "",
+          active: true
+        }
+      ];
+    }
+    return {
+      ...day,
+      dayNumber: day.dayNumber || idx + 1,
+      date: day.date || "",
+      events
+    };
+  };
 
   // Festival Schedule Card Form State
   const [cardForm, setCardForm] = useState({
@@ -53,8 +121,26 @@ const AartiScheduleManager = ({
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    const tabEnabled = config?.tabs?.aarti?.enabled !== false;
+    const secEnabled = config?.dailyAartiSection?.enabled !== false;
+    setIsSectionEnabled(tabEnabled && secEnabled);
+
+    if (config?.dailyAartiSection) {
+      setSectionHeaders(prev => ({
+        badgeMr: config.dailyAartiSection.badgeMr || prev.badgeMr,
+        badgeEn: config.dailyAartiSection.badgeEn || prev.badgeEn,
+        titleMr: config.dailyAartiSection.titleMr || prev.titleMr,
+        titleEn: config.dailyAartiSection.titleEn || prev.titleEn,
+        subtitleMr: config.dailyAartiSection.subtitleMr || prev.subtitleMr,
+        subtitleEn: config.dailyAartiSection.subtitleEn || prev.subtitleEn,
+        countdownLabelMr: config.dailyAartiSection.countdownLabelMr || prev.countdownLabelMr,
+        countdownLabelEn: config.dailyAartiSection.countdownLabelEn || prev.countdownLabelEn
+      }));
+    }
+
     if (config?.dailyAartiSchedule?.length) {
-      setSchedule(JSON.parse(JSON.stringify(config.dailyAartiSchedule)));
+      const cloned = JSON.parse(JSON.stringify(config.dailyAartiSchedule));
+      setSchedule(cloned.map(normalizeDayForAdmin));
     }
     if (config?.festivalScheduleCard) {
       const clean = (val, fb) => (typeof val === "string" && val.trim() && !val.includes("??") && !val.includes("\ufffd") ? val : fb);
@@ -155,7 +241,116 @@ const AartiScheduleManager = ({
     }
   };
 
-  const handleFieldChange = (index, field, value) => {
+  const handleToggleMasterSection = async () => {
+    const nextState = !isSectionEnabled;
+    setIsSectionEnabled(nextState);
+    if (onSaveAartiSchedule) {
+      setIsSaving(true);
+      const res = await onSaveAartiSchedule(schedule, {
+        dailyAartiSection: { ...sectionHeaders, enabled: nextState },
+        aartiTabEnabled: nextState
+      });
+      setIsSaving(false);
+      if (res?.success) {
+        onNotify(
+          nextState
+            ? (isEn ? "Daily Maha Aarti section turned ON and LIVE on home screen!" : "दैनिक महाआरती विभाग सुरू (ON) केला व मुख्य पानावर सक्रिय झाला!")
+            : (isEn ? "Daily Maha Aarti section turned OFF and hidden from visitors!" : "दैनिक महाआरती विभाग बंद (OFF) केला व रहिवाशांपासून लपवला!"),
+          "success"
+        );
+      } else {
+        onNotify(res?.message || (isEn ? "Failed to update section status" : "स्थिती बदलताना त्रुटी आली"), "error");
+      }
+    }
+  };
+
+  const handleAddDay = () => {
+    const nextNum = schedule.length + 1;
+    const newDay = {
+      dayNumber: nextNum,
+      dateStr: `दिवस ${nextNum}`,
+      dateStrEn: `Day ${nextNum}`,
+      date: "",
+      tithi: "",
+      tithiEn: "",
+      hostWing: "सर्व इमारती संयुक्त",
+      hostWingEn: "All Buildings Joint",
+      hostLead: "",
+      hostLeadEn: "",
+      isCurrentDay: schedule.length === 0,
+      events: [
+        {
+          id: `evt_${nextNum}_m_${Date.now()}`,
+          type: "morning",
+          categoryMr: "सकाळची महाआरती",
+          categoryEn: "Morning Maha Aarti",
+          titleMr: "प्रभात महाआरती व विधी",
+          titleEn: "Morning Maha Aarti & Ritual",
+          time: "सकाळी ०८:३० वाजता",
+          timeEn: "08:30 AM",
+          startTime: "08:30",
+          endTime: "09:30",
+          hostWing: "सर्व इमारती संयुक्त",
+          hostWingEn: "All Buildings Joint",
+          hostCoordinator: "",
+          hostCoordinatorEn: "",
+          prasad: "",
+          prasadEn: "",
+          descriptionMr: "",
+          descriptionEn: "",
+          active: true
+        },
+        {
+          id: `evt_${nextNum}_e_${Date.now()}`,
+          type: "evening",
+          categoryMr: "संध्याकाळची महाआरती",
+          categoryEn: "Evening Maha Aarti",
+          titleMr: "संध्याकाळची महाआरती व मंत्रपुष्पांजली",
+          titleEn: "Evening Maha Aarti & Mantrapushpanjali",
+          time: "रात्री ०८:०० वाजता",
+          timeEn: "08:00 PM",
+          startTime: "20:00",
+          endTime: "21:00",
+          hostWing: "सर्व इमारती संयुक्त",
+          hostWingEn: "All Buildings Joint",
+          hostCoordinator: "",
+          hostCoordinatorEn: "",
+          prasad: "",
+          prasadEn: "",
+          descriptionMr: "",
+          descriptionEn: "",
+          active: true
+        }
+      ]
+    };
+    setSchedule([...schedule, newDay]);
+    onNotify(isEn ? `Day ${nextNum} added!` : `दिवस ${nextNum} जोडला गेला!`, "success");
+  };
+
+  const handleDeleteDay = (index) => {
+    const isConfirmed = window.confirm(
+      isEn 
+        ? `Are you sure you want to delete Day ${schedule[index]?.dayNumber || index + 1}?`
+        : `तुम्हाला खात्री आहे की दिवस ${schedule[index]?.dayNumber || index + 1} हटवायचा आहे?`
+    );
+    if (!isConfirmed) return;
+
+    const updated = schedule.filter((_, idx) => idx !== index);
+    setSchedule(updated);
+    onNotify(isEn ? "Day removed from schedule" : "दिवस वेळापत्रकातून काढला गेला", "info");
+  };
+
+  const handleMoveDay = (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= schedule.length) return;
+    const updated = [...schedule];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+    setSchedule(updated);
+  };
+
+  const handleDayFieldChange = (index, field, value) => {
     const updated = [...schedule];
     updated[index][field] = value;
     setSchedule(updated);
@@ -169,10 +364,118 @@ const AartiScheduleManager = ({
     setSchedule(updated);
   };
 
+  const handleAddEvent = (dayIndex) => {
+    const updated = [...schedule];
+    const targetDay = updated[dayIndex];
+    if (!targetDay.events) targetDay.events = [];
+    const eventNum = targetDay.events.length + 1;
+    targetDay.events.push({
+      id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      type: "special",
+      categoryMr: "विशेष महाआरती",
+      categoryEn: "Special Maha Aarti",
+      titleMr: `विशेष पूजा व आरती ${eventNum}`,
+      titleEn: `Special Pooja & Aarti ${eventNum}`,
+      time: "दुपारी १२:०० वाजता",
+      timeEn: "12:00 PM",
+      startTime: "12:00",
+      endTime: "13:00",
+      hostWing: targetDay.hostWing || "सर्व इमारती संयुक्त",
+      hostWingEn: targetDay.hostWingEn || "All Buildings Joint",
+      hostCoordinator: targetDay.hostLead || "",
+      hostCoordinatorEn: targetDay.hostLeadEn || "",
+      prasad: "",
+      prasadEn: "",
+      descriptionMr: "",
+      descriptionEn: "",
+      active: true
+    });
+    setSchedule(updated);
+    onNotify(isEn ? "New event added to schedule!" : "वेळापत्रकात नवीन कार्यक्रम जोडला!", "info");
+  };
+
+  const handleDeleteEvent = (dayIndex, eventIndex) => {
+    const isConfirmed = window.confirm(
+      isEn 
+        ? "Are you sure you want to delete this event from the day's schedule?"
+        : "तुम्हाला खात्री आहे की हा कार्यक्रम दिवसाच्या वेळापत्रकातून काढायचा आहे?"
+    );
+    if (!isConfirmed) return;
+
+    const updated = [...schedule];
+    updated[dayIndex].events = updated[dayIndex].events.filter((_, eIdx) => eIdx !== eventIndex);
+    setSchedule(updated);
+    onNotify(isEn ? "Event deleted" : "कार्यक्रम काढला गेला", "info");
+  };
+
+  const handleMoveEvent = (dayIndex, eventIndex, direction) => {
+    const updated = [...schedule];
+    const events = [...(updated[dayIndex].events || [])];
+    const targetIdx = eventIndex + direction;
+    if (targetIdx < 0 || targetIdx >= events.length) return;
+    const temp = events[eventIndex];
+    events[eventIndex] = events[targetIdx];
+    events[targetIdx] = temp;
+    updated[dayIndex].events = events;
+    setSchedule(updated);
+  };
+
+  const handleEventFieldChange = (dayIndex, eventIndex, field, value) => {
+    const updated = [...schedule];
+    const evt = updated[dayIndex].events[eventIndex];
+    evt[field] = value;
+    
+    // Auto-update display time if 24h start time changes and display time is default
+    if (field === "startTime" && value && value.includes(":")) {
+      const [h, m] = value.split(":").map(Number);
+      const isPM = h >= 12;
+      const h12 = h % 12 || 12;
+      const formattedEn = `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${isPM ? "PM" : "AM"}`;
+      evt.timeEn = formattedEn;
+      const marathiPeriod = isPM ? (h >= 17 ? "रात्री" : "दुपारी") : (h < 12 ? "सकाळी" : "दुपारी");
+      evt.time = `${marathiPeriod} ${formattedEn}`;
+    }
+
+    setSchedule(updated);
+  };
+
   const handleSaveAarti = async (e) => {
     if (e) e.preventDefault();
     setIsSaving(true);
-    const res = await onSaveAartiSchedule(schedule);
+
+    // Sync top-level fields for backwards compatibility
+    const syncedSchedule = schedule.map((day) => {
+      const evts = day.events || [];
+      const mEvt = evts.find((e) => e.type === "morning") || evts[0];
+      const eEvt = evts.find((e) => e.type === "evening") || evts[1] || evts[0];
+
+      return {
+        ...day,
+        morningTime: mEvt?.time || day.morningTime || "सकाळी ०८:३० वाजता",
+        morningTimeEn: mEvt?.timeEn || day.morningTimeEn || "08:30 AM",
+        eveningTime: eEvt?.time || day.eveningTime || "रात्री ०८:०० वाजता",
+        eveningTimeEn: eEvt?.timeEn || day.eveningTimeEn || "08:00 PM",
+        morningRitual: mEvt?.titleMr || day.morningRitual || "",
+        morningRitualEn: mEvt?.titleEn || day.morningRitualEn || "",
+        eveningRitual: eEvt?.titleMr || day.eveningRitual || "",
+        eveningRitualEn: eEvt?.titleEn || day.eveningRitualEn || "",
+        hostWing: mEvt?.hostWing || day.hostWing || "सर्व इमारती संयुक्त",
+        hostWingEn: mEvt?.hostWingEn || day.hostWingEn || "All Buildings Joint",
+        hostLead: mEvt?.hostCoordinator || day.hostLead || "",
+        hostLeadEn: mEvt?.hostCoordinatorEn || day.hostLeadEn || "",
+        specialPrasad: mEvt?.prasad || eEvt?.prasad || day.specialPrasad || "",
+        specialPrasadEn: mEvt?.prasadEn || eEvt?.prasadEn || day.specialPrasadEn || ""
+      };
+    });
+
+    const res = await onSaveAartiSchedule(syncedSchedule, {
+      dailyAartiSection: {
+        ...sectionHeaders,
+        enabled: isSectionEnabled
+      },
+      aartiTabEnabled: isSectionEnabled
+    });
+
     setIsSaving(false);
     if (res?.success) {
       onNotify(
@@ -700,12 +1003,14 @@ const AartiScheduleManager = ({
         </form>
       </FestiveCard>
 
-      {/* 2. SECONDARY / COLLAPSIBLE SECTION: 10-DAY DAILY AARTI TIMINGS */}
-      <div className="bg-white rounded-3xl border-2 border-gold-300 p-5 sm:p-6 shadow-xs">
+      {/* 2. SECONDARY / FULLY DYNAMIC SECTION: DAILY MAHA AARTI & HOST WINGS */}
+      <div className="bg-white rounded-3xl border-2 border-gold-300 p-5 sm:p-6 shadow-xs space-y-5">
+        
+        {/* Section Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gold-200">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-600 to-maroon-900 text-gold-300 flex items-center justify-center border border-gold-400">
-              <Flame className="w-5 h-5 text-gold-300" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-maroon-900 text-gold-300 flex items-center justify-center border border-gold-400 shadow-xs">
+              <Flame className="w-5 h-5 text-gold-300 animate-diya" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-maroon-950 font-heading">
@@ -713,19 +1018,19 @@ const AartiScheduleManager = ({
               </h3>
               <p className="text-xs text-stone-600">
                 {isEn 
-                  ? "Configures morning and evening Maha Aarti times used for the Aarti card countdown and WhatsApp broadcast." 
-                  : "आरती कार्ड काउंटडाऊन व व्हॉट्सॲप ब्रॉडकास्टसाठी वापरल्या जाणाऱ्या सकाळ-संध्याकाळच्या आरती वेळा येथे बदला."}
+                  ? "Fully manage daily events, timings, host buildings, prasad, countdown, and active status." 
+                  : "दैनिक महाआरती, वेळा, यजमान इमारत, नैवेद्य व काउंटडाऊनचे संपूर्ण व्यवस्थापन येथून करा."}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => {
                 const txt = formatAartiScheduleBroadcast(schedule, config);
                 openWhatsApp(txt);
-                if (onNotify) onNotify(isEn ? "Opening WhatsApp with 10-day schedule..." : "१० दिवसांचे आरती वेळापत्रक व्हॉट्सॲपवर पाठवण्यासाठी तयार!", "success");
+                if (onNotify) onNotify(isEn ? "Opening WhatsApp with schedule..." : "आरती वेळापत्रक व्हॉट्सॲपवर पाठवण्यासाठी तयार!", "success");
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition cursor-pointer"
             >
@@ -735,100 +1040,574 @@ const AartiScheduleManager = ({
 
             <button
               type="button"
-              onClick={() => setShowDailyAartiSection(!showDailyAartiSection)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gold-100 hover:bg-gold-200 text-maroon-950 font-black text-xs border border-gold-300 shadow-2xs transition cursor-pointer"
+              onClick={handleAddDay}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-maroon-900 to-maroon-850 hover:from-maroon-850 hover:to-maroon-800 text-gold-200 font-bold text-xs border border-gold-400 shadow-xs transition cursor-pointer"
             >
-              <span>{showDailyAartiSection ? (isEn ? "Hide Timings" : "वेळा लपवा") : (isEn ? "Edit Timings" : "आरती वेळा संपादित करा")}</span>
+              <Plus className="w-3.5 h-3.5 text-gold-300" />
+              <span>{isEn ? "Add Day" : "नवीन दिवस जोडा"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowDailyAartiSection(!showDailyAartiSection)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gold-100 hover:bg-gold-200 text-maroon-950 font-black text-xs border border-gold-300 shadow-2xs transition cursor-pointer"
+            >
+              <span>{showDailyAartiSection ? (isEn ? "Hide Editor" : "संपादक लपवा") : (isEn ? "Show Editor" : "संपादक उघडा")}</span>
               {showDailyAartiSection ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
-        {/* Collapsible Daily Aarti Table */}
-        {showDailyAartiSection && (
-          <form onSubmit={handleSaveAarti} className="mt-5 space-y-4 animate-fadeIn">
-            {schedule.map((item, idx) => {
-              const isToday = Boolean(item.isCurrentDay);
-              const dayDisplayTitle = isEn 
-                ? (item.dateStrEn || item.dateStr || `Day ${item.dayNumber || idx + 1}`) 
-                : (item.dateStr || `दिवस ${item.dayNumber || idx + 1}`);
+        {/* MASTER ON / OFF TOGGLE BANNER */}
+        <div className={`p-4 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+          isSectionEnabled 
+            ? "bg-gradient-to-r from-emerald-50 via-white to-emerald-50/60 border-emerald-400 shadow-xs" 
+            : "bg-stone-100 border-stone-300 text-stone-600"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-xs ${
+              isSectionEnabled 
+                ? "bg-emerald-600 text-white border-emerald-500" 
+                : "bg-stone-300 text-stone-600 border-stone-400"
+            }`}>
+              <Power className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-stone-800">
+                  {isEn ? "Daily Maha Aarti Section Status:" : "दैनिक महाआरती विभाग स्थिती:"}
+                </span>
+                <span className={`inline-flex items-center gap-1.5 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                  isSectionEnabled 
+                    ? "bg-emerald-600 text-white shadow-xs" 
+                    : "bg-stone-500 text-white"
+                }`}>
+                  <span className={`w-2 h-2 rounded-full bg-white ${isSectionEnabled ? "animate-pulse" : ""}`} />
+                  {isSectionEnabled 
+                    ? (isEn ? "LIVE ON HOME SCREEN (ON)" : "मुख्य पानावर सक्रिय (चालू)") 
+                    : (isEn ? "HIDDEN FROM RESIDENTS (OFF)" : "रहिवाशांपासून लपवले (बंद)")}
+                </span>
+              </div>
+              <p className="text-[11px] text-stone-600 mt-0.5">
+                {isSectionEnabled 
+                  ? (isEn ? "The section and live countdown are active and visible to all residents." : "हा विभाग व लाइव्ह काउंटडाऊन मुख्य स्क्रीनवर सर्व भाविकांना सक्रिय दिसेल.") 
+                  : (isEn ? "Section is switched OFF. No content or timers are shown on the website." : "हा विभाग बंद आहे. वेबसाइटवर कोणतेही जुने काउंटडाऊन किंवा कार्ड्स दिसणार नाहीत.")}
+              </p>
+            </div>
+          </div>
 
-              return (
-                <div
-                  key={item.dayNumber || idx}
-                  className={`p-4 rounded-2xl border-2 transition-all duration-300 ${
-                    isToday
-                      ? "bg-amber-50/70 border-gold-500 shadow-xs ring-1 ring-gold-400"
-                      : "bg-[#FFFDF9] border-gold-200 hover:border-gold-300"
-                  }`}
+          <button
+            type="button"
+            onClick={handleToggleMasterSection}
+            className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+              isSectionEnabled 
+                ? "bg-rose-600 hover:bg-rose-700 text-white" 
+                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+            }`}
+          >
+            <Power className="w-4 h-4" />
+            <span>
+              {isSectionEnabled 
+                ? (isEn ? "Turn Section OFF" : "विभाग बंद करा (Turn OFF)") 
+                : (isEn ? "Turn Section ON" : "विभाग सुरू करा (Turn ON)")}
+            </span>
+          </button>
+        </div>
+
+        {/* Collapsible Content Area */}
+        {showDailyAartiSection && (
+          <form onSubmit={handleSaveAarti} className="space-y-6 animate-fadeIn">
+            
+            {/* 1. SECTION TITLES & DISPLAY TEXTS ACCORDION */}
+            <div className="rounded-2xl border-2 border-gold-300 bg-[#FFFDF9] overflow-hidden shadow-xs">
+              <div 
+                onClick={() => setShowSectionHeaders(!showSectionHeaders)}
+                className="p-3.5 sm:p-4 bg-gradient-to-r from-amber-50 to-white flex items-center justify-between cursor-pointer hover:bg-amber-100/60 transition"
+              >
+                <div className="flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-amber-800" />
+                  <span className="text-xs font-black text-maroon-950 uppercase tracking-wider font-heading">
+                    {isEn ? "Customize Section Display Titles & Banner Texts" : "विभाग शीर्षक व काउंटडाऊन बॅनर मजकूर सानुकूलित करा"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-stone-500 text-xs">
+                  <span>{showSectionHeaders ? (isEn ? "Hide" : "लपवा") : (isEn ? "Customize" : "बदला")}</span>
+                  {showSectionHeaders ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+              </div>
+
+              {showSectionHeaders && (
+                <div className="p-4 sm:p-5 border-t border-gold-200 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs animate-fadeIn">
+                  <div>
+                    <FestiveInput
+                      label={isEn ? "Section Badge (Pill at top):" : "विभाग बॅज (सर्वात वरील बॅज):"}
+                      value={isEn ? (sectionHeaders.badgeEn || "") : (sectionHeaders.badgeMr || "")}
+                      onChange={(e) => setSectionHeaders(prev => ({
+                        ...prev,
+                        [isEn ? "badgeEn" : "badgeMr"]: e.target.value
+                      }))}
+                      placeholder={isEn ? "Daily Maha Aarti & Host Wings" : "दैनिक महाआरती व यजमान"}
+                    />
+                  </div>
+
+                  <div>
+                    <FestiveInput
+                      label={isEn ? "Section Title (Main heading):" : "विभाग मुख्य शीर्षक (Heading):"}
+                      value={isEn ? (sectionHeaders.titleEn || "") : (sectionHeaders.titleMr || "")}
+                      onChange={(e) => setSectionHeaders(prev => ({
+                        ...prev,
+                        [isEn ? "titleEn" : "titleMr"]: e.target.value
+                      }))}
+                      placeholder={isEn ? "Daily Maha Aarti & Host Wings" : "दैनिक महाआरती व विंग यजमान"}
+                    />
+                  </div>
+
+                  <div>
+                    <FestiveInput
+                      label={isEn ? "Section Subtitle / Daily Timing text:" : "विभाग उपशीर्षक / नियमित वेळ माहिती:"}
+                      value={isEn ? (sectionHeaders.subtitleEn || "") : (sectionHeaders.subtitleMr || "")}
+                      onChange={(e) => setSectionHeaders(prev => ({
+                        ...prev,
+                        [isEn ? "subtitleEn" : "subtitleMr"]: e.target.value
+                      }))}
+                      placeholder={isEn ? "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal" : "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती"}
+                    />
+                  </div>
+
+                  <div>
+                    <FestiveInput
+                      label={isEn ? "Countdown Box Header Label:" : "काउंटडाऊन बॉक्स वरील लेबल:"}
+                      value={isEn ? (sectionHeaders.countdownLabelEn || "") : (sectionHeaders.countdownLabelMr || "")}
+                      onChange={(e) => setSectionHeaders(prev => ({
+                        ...prev,
+                        [isEn ? "countdownLabelEn" : "countdownLabelMr"]: e.target.value
+                      }))}
+                      placeholder={isEn ? "Time Remaining Until Next Aarti" : "पुढील महाआरतीसाठी शिल्लक वेळ"}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. DAY-WISE SCHEDULES LIST */}
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-maroon-950 font-heading">
+                    {isEn ? `Scheduled Days (${schedule.length} Total)` : `नियोजित दिवस (एकूण ${schedule.length})`}
+                  </span>
+                  <span className="text-[11px] text-stone-500">
+                    {isEn ? "— Reorder, add or remove days" : "— दिवस जोडा, क्रम बदला किंवा काढा"}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddDay}
+                  className="px-3 py-1.5 rounded-xl bg-gold-100 hover:bg-gold-200 text-maroon-950 text-xs font-black border border-gold-300 flex items-center gap-1.5 transition cursor-pointer"
                 >
-                  {/* Day Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-gold-200">
-                    <div className="flex items-center gap-2">
-                      <span className="w-7 h-7 rounded-lg bg-maroon-900 text-gold-300 font-black flex items-center justify-center text-xs">
-                        {item.dayNumber || idx + 1}
-                      </span>
-                      <span className="font-heading font-black text-sm text-maroon-950">
-                        {dayDisplayTitle}
-                      </span>
-                      {isToday && (
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-600 text-white shadow-xs">
-                          {isEn ? "Today" : "आज"}
+                  <Plus className="w-3.5 h-3.5 text-maroon-800" />
+                  <span>{isEn ? "+ Add Another Day" : "+ नवीन दिवस जोडा"}</span>
+                </button>
+              </div>
+
+              {schedule.map((dayItem, dIdx) => {
+                const isToday = Boolean(dayItem.isCurrentDay);
+                const dayDisplayTitle = isEn 
+                  ? (dayItem.dateStrEn || dayItem.dateStr || `Day ${dayItem.dayNumber || dIdx + 1}`) 
+                  : (dayItem.dateStr || `दिवस ${dayItem.dayNumber || dIdx + 1}`);
+
+                const events = dayItem.events || [];
+
+                return (
+                  <div
+                    key={dayItem.id || dayItem.dayNumber || dIdx}
+                    className={`rounded-2xl border-2 transition-all p-4 sm:p-5 shadow-xs space-y-4 ${
+                      isToday 
+                        ? "bg-amber-50/80 border-gold-500 ring-2 ring-gold-400/50" 
+                        : "bg-[#FFFDF9] border-gold-300 hover:border-gold-400"
+                    }`}
+                  >
+                    {/* Day Top Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gold-200">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-8 h-8 rounded-xl bg-maroon-900 text-gold-300 font-black flex items-center justify-center text-xs shadow-xs border border-gold-400">
+                          {dayItem.dayNumber || dIdx + 1}
                         </span>
+                        <div>
+                          <span className="font-heading font-black text-sm sm:text-base text-maroon-950 block">
+                            {dayDisplayTitle}
+                          </span>
+                          <span className="text-[11px] text-stone-500">
+                            {events.length} {events.length === 1 ? "Event / Aarti" : "Events / Aartis"}
+                          </span>
+                        </div>
+                        {isToday && (
+                          <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-red-600 text-white shadow-xs ml-1">
+                            {isEn ? "Today / Active" : "आज (सक्रिय)"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Day Action Buttons */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleSetCurrentDay(dIdx)}
+                          className={`px-3 py-1 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                            isToday
+                              ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                              : "bg-white text-maroon-900 hover:bg-gold-100 border-gold-300"
+                          }`}
+                        >
+                          {isToday ? (isEn ? "✓ Active Today" : "✓ आजचा सक्रिय दिवस") : (isEn ? "Set as Today" : "आजचा दिवस बनवा")}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleMoveDay(dIdx, -1)}
+                          disabled={dIdx === 0}
+                          title={isEn ? "Move Day Up" : "दिवस वर घ्या"}
+                          className="p-1.5 rounded-xl bg-white hover:bg-gold-100 border border-gold-300 text-stone-700 disabled:opacity-40 transition cursor-pointer"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleMoveDay(dIdx, 1)}
+                          disabled={dIdx === schedule.length - 1}
+                          title={isEn ? "Move Day Down" : "दिवस खाली घ्या"}
+                          className="p-1.5 rounded-xl bg-white hover:bg-gold-100 border border-gold-300 text-stone-700 disabled:opacity-40 transition cursor-pointer"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDay(dIdx)}
+                          title={isEn ? "Delete Day" : "दिवस हटवा"}
+                          className="p-1.5 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Day Core Info Inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <FestiveInput
+                          label={isEn ? "Day & Date Label (English):" : "दिवस व तारीख लेबल (इंग्रजी):"}
+                          value={dayItem.dateStrEn || ""}
+                          onChange={(e) => handleDayFieldChange(dIdx, "dateStrEn", e.target.value)}
+                          placeholder="e.g. Day 1 (Ganesh Chaturthi - 14 Sep)"
+                        />
+                      </div>
+                      <div>
+                        <FestiveInput
+                          label={isEn ? "Day & Date Label (Marathi):" : "दिवस व तारीख लेबल (मराठी):"}
+                          value={dayItem.dateStr || ""}
+                          onChange={(e) => handleDayFieldChange(dIdx, "dateStr", e.target.value)}
+                          placeholder="उदा. दिवस १ (गणेश चतुर्थी - ७ सप्टेंबर)"
+                        />
+                      </div>
+                      <div>
+                        <FestiveInput
+                          label={isEn ? "Calendar Date (for IST Countdown):" : "कॅलेंडर तारीख (काउंटडाऊन अचूकतेसाठी):"}
+                          type="date"
+                          value={dayItem.date || ""}
+                          onChange={(e) => handleDayFieldChange(dIdx, "date", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <FestiveInput
+                          label={isEn ? "Day Number:" : "दिवस क्रमांक:"}
+                          type="number"
+                          value={dayItem.dayNumber || dIdx + 1}
+                          onChange={(e) => handleDayFieldChange(dIdx, "dayNumber", parseInt(e.target.value, 10) || 1)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* EVENTS / AARTI SCHEDULE FOR THIS DAY */}
+                    <div className="mt-3 pt-3 border-t border-gold-200/80 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Flame className="w-4 h-4 text-orange-600" />
+                          <span className="text-xs font-black text-maroon-950 uppercase tracking-wide">
+                            {isEn ? "Scheduled Events for this Day:" : "या दिवसाच्या आरत्या व कार्यक्रम:"}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddEvent(dIdx)}
+                          className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-maroon-900 to-maroon-850 hover:from-maroon-850 hover:to-maroon-800 text-gold-200 text-xs font-bold border border-gold-400 flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3 text-gold-300" />
+                          <span>{isEn ? "Add Event" : "आरती / पूजा जोडा"}</span>
+                        </button>
+                      </div>
+
+                      {events.length === 0 ? (
+                        <div className="p-4 bg-amber-50/50 rounded-xl border border-dashed border-gold-300 text-center text-xs text-stone-500">
+                          {isEn ? "No events configured for this day. Click \"Add Event\" to create an aarti schedule." : "या दिवसासाठी कोणतीही आरती जोडलेली नाही. नवीन आरती जोडण्यासाठी वरील \"आरती / पूजा जोडा\" वर क्लिक करा."}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {events.map((evt, eIdx) => {
+                            const isEvtActive = evt.active !== false;
+
+                            return (
+                              <div
+                                key={evt.id || eIdx}
+                                className={`p-3.5 rounded-xl border-2 transition-all space-y-3 ${
+                                  isEvtActive 
+                                    ? "bg-white border-gold-300 shadow-2xs" 
+                                    : "bg-stone-50 border-stone-300 opacity-60"
+                                }`}
+                              >
+                                {/* Event Header Bar */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gold-200">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-lg bg-gold-200 text-maroon-900 border border-gold-300">
+                                      #{eIdx + 1} {isEn ? (evt.categoryEn || evt.categoryMr || "Aarti") : (evt.categoryMr || evt.categoryEn || "आरती")}
+                                    </span>
+                                    <span className="font-bold text-xs text-maroon-950 truncate max-w-[200px]">
+                                      {isEn ? (evt.titleEn || evt.titleMr) : (evt.titleMr || evt.titleEn)}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEventFieldChange(dIdx, eIdx, "active", !isEvtActive)}
+                                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                                        isEvtActive 
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-300" 
+                                          : "bg-stone-200 text-stone-700 border-stone-300"
+                                      }`}
+                                    >
+                                      {isEvtActive ? (isEn ? "Active (सक्रिय)" : "सक्रिय") : (isEn ? "Inactive (बंद)" : "बंद")}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveEvent(dIdx, eIdx, -1)}
+                                      disabled={eIdx === 0}
+                                      title={isEn ? "Move Event Up" : "वर घ्या"}
+                                      className="p-1 rounded-lg bg-white hover:bg-gold-100 border border-gold-300 text-stone-700 disabled:opacity-30 transition cursor-pointer"
+                                    >
+                                      <ArrowUp className="w-3 h-3" />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveEvent(dIdx, eIdx, 1)}
+                                      disabled={eIdx === events.length - 1}
+                                      title={isEn ? "Move Event Down" : "खाली घ्या"}
+                                      className="p-1 rounded-lg bg-white hover:bg-gold-100 border border-gold-300 text-stone-700 disabled:opacity-30 transition cursor-pointer"
+                                    >
+                                      <ArrowDown className="w-3 h-3" />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteEvent(dIdx, eIdx)}
+                                      title={isEn ? "Delete Event" : "कार्यक्रम काढा"}
+                                      className="p-1 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Event Detailed Fields Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                                  {/* 1. Category / Badge */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                                      {isEn ? "Event Category / Badge:" : "आरती / कार्यक्रम प्रकार:"}
+                                    </label>
+                                    <select
+                                      value={evt.categoryEn || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        let mrVal = "महाआरती";
+                                        if (val === "Morning Maha Aarti") mrVal = "सकाळची महाआरती";
+                                        else if (val === "Evening Maha Aarti") mrVal = "संध्याकाळची महाआरती";
+                                        else if (val === "Special Aarti") mrVal = "विशेष महाआरती";
+                                        else if (val === "Ganpati Aarti") mrVal = "गणपती महाआरती";
+                                        else if (val === "Dhupaarti") mrVal = "धूपारती व मंत्रपुष्पांजली";
+                                        else if (val === "Cultural Event") mrVal = "सांस्कृतिक कार्यक्रम";
+                                        else mrVal = val;
+                                        
+                                        handleEventFieldChange(dIdx, eIdx, "categoryEn", val);
+                                        handleEventFieldChange(dIdx, eIdx, "categoryMr", mrVal);
+                                      }}
+                                      className="w-full px-2.5 py-1.5 rounded-xl border border-gold-300 bg-white text-xs font-semibold text-maroon-950 focus:outline-none focus:ring-1 focus:ring-gold-500"
+                                    >
+                                      <option value="Morning Maha Aarti">🔥 Morning Maha Aarti (सकाळची महाआरती)</option>
+                                      <option value="Evening Maha Aarti">✨ Evening Maha Aarti (संध्याकाळची महाआरती)</option>
+                                      <option value="Special Aarti">🌟 Special Aarti (विशेष महाआरती)</option>
+                                      <option value="Ganpati Aarti">🪔 Ganpati Aarti (गणपती महाआरती)</option>
+                                      <option value="Dhupaarti">🕯️ Dhupaarti (धूपारती)</option>
+                                      <option value="Cultural Event">🎭 Cultural Event (सांस्कृतिक कार्यक्रम)</option>
+                                      <option value="Custom">📝 Custom Badge</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Custom Badge Text Override */}
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Custom Badge Text:" : "कस्टम बॅज मजकूर:"}
+                                      value={isEn ? (evt.categoryEn || "") : (evt.categoryMr || "")}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, isEn ? "categoryEn" : "categoryMr", e.target.value)}
+                                      placeholder={isEn ? "e.g. Morning Maha Aarti" : "उदा. सकाळची महाआरती"}
+                                    />
+                                  </div>
+
+                                  {/* 2. Start Time & End Time (24-hour) */}
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Start Time (Countdown schedule):" : "सुरू वेळ (२४ तास फॉरमॅट):"}
+                                      type="time"
+                                      value={evt.startTime || "08:30"}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "startTime", e.target.value)}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "End Time (Auto Completed state):" : "समाप्ती वेळ:"}
+                                      type="time"
+                                      value={evt.endTime || "09:30"}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "endTime", e.target.value)}
+                                    />
+                                  </div>
+
+                                  {/* 3. Event Title (English & Marathi) */}
+                                  <div className="sm:col-span-2">
+                                    <FestiveInput
+                                      label={isEn ? "Event Title (English):" : "कार्यक्रम शीर्षक (इंग्रजी):"}
+                                      value={evt.titleEn || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "titleEn", e.target.value)}
+                                      placeholder="e.g. Murti Pranpratishtha Pooja & Maha Aarti"
+                                      required
+                                    />
+                                  </div>
+
+                                  <div className="sm:col-span-2">
+                                    <FestiveInput
+                                      label={isEn ? "Event Title (Marathi):" : "कार्यक्रम शीर्षक (मराठी):"}
+                                      value={evt.titleMr || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "titleMr", e.target.value)}
+                                      placeholder="उदा. मूर्ती प्राणप्रतिष्ठा पूजा व महाआरती"
+                                      required
+                                    />
+                                  </div>
+
+                                  {/* 4. Display Time String */}
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Display Time (English):" : "दर्शवलेली वेळ (इंग्रजी):"}
+                                      value={evt.timeEn || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "timeEn", e.target.value)}
+                                      placeholder="08:30 AM"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Display Time (Marathi):" : "दर्शवलेली वेळ (मराठी):"}
+                                      value={evt.time || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "time", e.target.value)}
+                                      placeholder="सकाळी ०८:३० वाजता"
+                                    />
+                                  </div>
+
+                                  {/* 5. Host Building & Quick Buttons */}
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Host Building (English):" : "यजमान इमारत (इंग्रजी):"}
+                                      value={evt.hostWingEn || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "hostWingEn", e.target.value)}
+                                      placeholder="e.g. All 5 Buildings Joint (G, H, I, J, K)"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Host Building (Marathi):" : "यजमान इमारत (मराठी):"}
+                                      value={evt.hostWing || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "hostWing", e.target.value)}
+                                      placeholder="उदा. सर्व इमारती संयुक्त (G, H, J, K)"
+                                    />
+                                  </div>
+
+                                  {/* 6. Host Coordinator / Representative */}
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Host Coordinator (English):" : "यजमान समन्वयक (इंग्रजी):"}
+                                      value={evt.hostCoordinatorEn || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "hostCoordinatorEn", e.target.value)}
+                                      placeholder="All Committee Members & Senior Residents"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Host Coordinator (Marathi):" : "यजमान समन्वयक (मराठी):"}
+                                      value={evt.hostCoordinator || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "hostCoordinator", e.target.value)}
+                                      placeholder="म्हाडा उत्सव कमिटी पदाधिकारी"
+                                    />
+                                  </div>
+
+                                  {/* 7. Offering / Prasad */}
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Offering / Prasad (English):" : "नैवेद्य / प्रसाद (इंग्रजी):"}
+                                      value={evt.prasadEn || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "prasadEn", e.target.value)}
+                                      placeholder="Steamed Ukadiche Modak"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <FestiveInput
+                                      label={isEn ? "Offering / Prasad (Marathi):" : "नैवेद्य / प्रसाद (मराठी):"}
+                                      value={evt.prasad || ""}
+                                      onChange={(e) => handleEventFieldChange(dIdx, eIdx, "prasad", e.target.value)}
+                                      placeholder="उकडीचे मोदक"
+                                    />
+                                  </div>
+
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSetCurrentDay(idx)}
-                        className={`px-3 py-1 rounded-xl text-xs font-bold border transition ${
-                          isToday
-                            ? "bg-amber-600 text-white border-amber-600"
-                            : "bg-white text-maroon-900 hover:bg-gold-100 border-gold-300"
-                        }`}
-                      >
-                        {isToday ? (isEn ? "Active Day" : "आजचा सक्रिय दिवस") : (isEn ? "Set as Today" : "आजचा दिवस बनवा")}
-                      </button>
-                    </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Day Aarti Input Fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                    <div>
-                      <FestiveInput
-                        label={isEn ? "Day & Date" : "दिवस व दिनांक"}
-                        value={isEn ? (item.dateStrEn || "") : (item.dateStr || "")}
-                        onChange={(e) => handleFieldChange(idx, isEn ? "dateStrEn" : "dateStr", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <FestiveInput
-                        label={isEn ? "Host Building" : "यजमान इमारत"}
-                        value={isEn ? (item.hostWingEn || "") : (item.hostWing || "")}
-                        onChange={(e) => handleFieldChange(idx, isEn ? "hostWingEn" : "hostWing", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <FestiveInput
-                        label={isEn ? "Morning Time" : "प्रभात आरती वेळ"}
-                        value={isEn ? (item.morningTimeEn || "") : (item.morningTime || "")}
-                        onChange={(e) => handleFieldChange(idx, isEn ? "morningTimeEn" : "morningTime", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <FestiveInput
-                        label={isEn ? "Evening Time" : "सायं आरती वेळ"}
-                        value={isEn ? (item.eveningTimeEn || "") : (item.eveningTime || "")}
-                        onChange={(e) => handleFieldChange(idx, isEn ? "eveningTimeEn" : "eveningTime", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {/* Bottom Action Bar */}
+            <div className="pt-4 border-t-2 border-gold-300 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleAddDay}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gold-100 hover:bg-gold-200 text-maroon-950 font-black text-xs border border-gold-300 flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-maroon-800" />
+                <span>{isEn ? "+ Add New Day" : "+ नवीन दिवस जोडा"}</span>
+              </button>
 
-            <div className="pt-3 border-t border-gold-200 flex justify-end">
               <FestiveButton
                 type="submit"
                 icon={Save}
@@ -836,9 +1615,13 @@ const AartiScheduleManager = ({
                 size="md"
                 disabled={isSaving}
               >
-                {isSaving ? (isEn ? "Saving..." : "जतन करत आहे...") : (isEn ? "Save Aarti Timings" : "आरती वेळा जतन करा")}
+                {isSaving 
+                  ? (isEn ? "Saving Schedule..." : "जतन करत आहे...") 
+                  : (isEn ? "Save Daily Aarti Schedule & Timings" : "दैनिक आरती वेळापत्रक जतन करा (Save)")
+                }
               </FestiveButton>
             </div>
+
           </form>
         )}
       </div>

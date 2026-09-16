@@ -13,6 +13,40 @@ const DEFAULT_CONFIG = {
   festivalStatus: "उत्सव सुरू आहे (Festival Live)",
   marqueeText: "गणपती बाप्पा मोरया! दैनिक महाआरती सकाळी ८:३० व रात्री ८:०० वाजता | सर्व भाविकांनी आरतीला उपस्थित राहावे.",
   marqueeActive: true,
+  scrollerMessages: [
+    {
+      id: "msg_1",
+      text: "7:30 PM. Kindly arrive 10 minutes earlier.",
+      textMr: "संध्या. ७:३० वाजता. कृपया १० मिनिटे आधी यावे.",
+      textEn: "7:30 PM. Kindly arrive 10 minutes earlier.",
+      isActive: true,
+      order: 1
+    },
+    {
+      id: "msg_2",
+      text: "All 5 Buildings (G • H • J • K • I) • MHADA Towers",
+      textMr: "सर्व ५ इमारती (G • H • J • K • I) • म्हाडा टॉवर्स",
+      textEn: "All 5 Buildings (G • H • J • K • I) • MHADA Towers",
+      isActive: true,
+      order: 2
+    },
+    {
+      id: "msg_3",
+      text: "Daily Maha Aarti: 08:30 AM & 08:00 PM",
+      textMr: "दैनिक महाआरती: सकाळी ८:३० व रात्री ८:०० वाजता",
+      textEn: "Daily Maha Aarti: 08:30 AM & 08:00 PM",
+      isActive: true,
+      order: 3
+    },
+    {
+      id: "msg_4",
+      text: "Shree Ganeshotsav 2026 • Digital Information Center",
+      textMr: "श्री गणेशोत्सव २०२६ • डिजिटल माहिती केंद्र",
+      textEn: "Shree Ganeshotsav 2026 • Digital Information Center",
+      isActive: true,
+      order: 4
+    }
+  ],
   participatingWings: ["G", "H", "J", "K"],
   whatsAppCommunityLink: "https://chat.whatsapp.com/sample-mhada-ganpati-community",
   emergencyHelpline: "+91 98220 11223",
@@ -43,6 +77,17 @@ const DEFAULT_CONFIG = {
     bottomCardSubtitle: "Wings G, H, J, K",
     bottomCardTagline: "❤️ ४ विंग्स, एकच परिवार",
     bottomCardSubtag: "सहकार्य • शिस्त • अखंड भक्ती"
+  },
+  dailyAartiSection: {
+    enabled: true,
+    badgeMr: "दैनिक महाआरती व यजमान",
+    badgeEn: "Daily Maha Aarti & Host Wings",
+    titleMr: "दैनिक महाआरती व विंग यजमान",
+    titleEn: "Daily Maha Aarti & Host Wings",
+    subtitleMr: "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती",
+    subtitleEn: "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal",
+    countdownLabelMr: "पुढील महाआरतीसाठी शिल्लक वेळ",
+    countdownLabelEn: "Time Remaining Until Next Aarti"
   },
   dailyAartiSchedule: [],
   newsletter: {
@@ -157,6 +202,9 @@ export const ConfigProvider = ({ children }) => {
         const cleaned = {
           ...DEFAULT_CONFIG,
           ...parsed,
+          scrollerMessages: (parsed.scrollerMessages && Array.isArray(parsed.scrollerMessages) && parsed.scrollerMessages.length > 0)
+            ? parsed.scrollerMessages
+            : DEFAULT_CONFIG.scrollerMessages,
           festivalScheduleCard: cleanFestivalScheduleCard(parsed.festivalScheduleCard)
         };
         return cleaned;
@@ -176,6 +224,9 @@ export const ConfigProvider = ({ children }) => {
         const merged = {
           ...DEFAULT_CONFIG,
           ...serverConfig,
+          scrollerMessages: (serverConfig.scrollerMessages && Array.isArray(serverConfig.scrollerMessages) && serverConfig.scrollerMessages.length > 0)
+            ? serverConfig.scrollerMessages
+            : DEFAULT_CONFIG.scrollerMessages,
           tabs: { ...DEFAULT_CONFIG.tabs, ...(serverConfig.tabs || {}) },
           sidebarSettings: { ...DEFAULT_CONFIG.sidebarSettings, ...(serverConfig.sidebarSettings || {}) },
           festivalScheduleCard: cleanFestivalScheduleCard(serverConfig.festivalScheduleCard),
@@ -396,17 +447,34 @@ export const ConfigProvider = ({ children }) => {
     }
   };
 
-  const updateAartiSchedule = async (dailyAartiSchedule) => {
+  const updateAartiSchedule = async (dailyAartiSchedule, extraConfig = {}) => {
     try {
-      const res = await API.put("/config/aarti-schedule", { dailyAartiSchedule });
+      const payload = { dailyAartiSchedule, ...extraConfig };
+      const res = await API.put("/config/aarti-schedule", payload);
       if (res.data.success) {
-        const updated = { ...config, dailyAartiSchedule: res.data.dailyAartiSchedule };
+        const updated = { 
+          ...config, 
+          dailyAartiSchedule: res.data.dailyAartiSchedule,
+          ...(res.data.dailyAartiSection ? { dailyAartiSection: res.data.dailyAartiSection } : {}),
+          ...(res.data.festivalScheduleCard ? { festivalScheduleCard: res.data.festivalScheduleCard } : {}),
+          ...(res.data.tabs ? { tabs: res.data.tabs } : {})
+        };
         saveLocal(updated);
         return { success: true };
       }
       return { success: false, message: res.data.message };
     } catch (err) {
-      const updated = { ...config, dailyAartiSchedule };
+      const updated = { 
+        ...config, 
+        dailyAartiSchedule,
+        ...(extraConfig.dailyAartiSection ? { dailyAartiSection: extraConfig.dailyAartiSection } : {}),
+        ...(extraConfig.aartiTabEnabled !== undefined && config?.tabs?.aarti ? {
+          tabs: {
+            ...config.tabs,
+            aarti: { ...config.tabs.aarti, enabled: extraConfig.aartiTabEnabled, approved: extraConfig.aartiTabEnabled }
+          }
+        } : {})
+      };
       saveLocal(updated);
       return { success: true, message: "स्थानिकरित्या जतन झाले" };
     }
@@ -453,6 +521,30 @@ export const ConfigProvider = ({ children }) => {
     }
   };
 
+  const updateScroller = async (scrollerData) => {
+    try {
+      const res = await API.put("/config/scroller", scrollerData);
+      if (res.data?.success) {
+        const updated = {
+          ...config,
+          marqueeActive: res.data.marqueeActive !== undefined ? res.data.marqueeActive : config.marqueeActive,
+          scrollerMessages: res.data.scrollerMessages || config.scrollerMessages
+        };
+        saveLocal(updated);
+        return { success: true, message: res.data.message };
+      }
+      return { success: false, message: res.data?.message || "Failed to update scroller settings" };
+    } catch (err) {
+      const updated = {
+        ...config,
+        ...(scrollerData.marqueeActive !== undefined ? { marqueeActive: scrollerData.marqueeActive } : {}),
+        ...(scrollerData.scrollerMessages ? { scrollerMessages: scrollerData.scrollerMessages } : {})
+      };
+      saveLocal(updated);
+      return { success: true, message: "स्थानिकरित्या जतन झाले (Saved locally)" };
+    }
+  };
+
   return (
     <ConfigContext.Provider
       value={{
@@ -471,7 +563,8 @@ export const ConfigProvider = ({ children }) => {
         updateSidebar,
         updateAartiSchedule,
         updateMandalInfo,
-        updateFestivalScheduleCard
+        updateFestivalScheduleCard,
+        updateScroller
       }}
     >
       {children}

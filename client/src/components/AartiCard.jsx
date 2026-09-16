@@ -1,91 +1,250 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
-  Flame, Clock, Building, Sparkles, 
-  MapPin, CheckCircle2, Timer
+  Flame, Clock, Building, Sparkles, Timer
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
+
+// Helper to parse any 12h/24h/Marathi time string into 24-hour HH:mm
+const parseTimeTo24h = (str) => {
+  if (!str) return "08:30";
+  const trimmed = str.trim();
+  const m24 = trimmed.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/);
+  if (m24) return `${m24[1].padStart(2, "0")}:${m24[2]}`;
+
+  const isPM = /pm|रात्री|संध्या|सायं/i.test(trimmed);
+  const isAM = /am|सकाळी|प्रभात/i.test(trimmed);
+
+  const marathiDigits = ["०", "१", "२", "३", "४", "५", "६", "७", "८", "९"];
+  let cleanStr = trimmed;
+  marathiDigits.forEach((d, i) => {
+    cleanStr = cleanStr.replaceAll(d, String(i));
+  });
+
+  const timeMatch = cleanStr.match(/(\d{1,2})[:.](\d{2})/);
+  if (timeMatch) {
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = timeMatch[2];
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+  return "08:30";
+};
+
+// Normalize day item to always have a clean events array
+const normalizeDayEvents = (day, dayIndex) => {
+  if (Array.isArray(day.events) && day.events.length > 0) {
+    return day.events.filter((e) => e && e.active !== false);
+  }
+
+  // Backwards-compatible synthesis for legacy records
+  const syntheticEvents = [];
+  const morningTimeEn = day.morningTimeEn || "08:30 AM";
+  const morningTimeMr = day.morningTime || "सकाळी ०८:३० वाजता";
+  syntheticEvents.push({
+    id: `legacy_m_${day.dayNumber || dayIndex + 1}`,
+    type: "morning",
+    categoryMr: "सकाळची महाआरती",
+    categoryEn: "Morning Maha Aarti",
+    titleMr: day.morningRitual || "मूर्ती प्राणप्रतिष्ठा पूजा व महाआरती",
+    titleEn: day.morningRitualEn || day.morningRitual || "Morning Maha Aarti",
+    time: morningTimeMr,
+    timeEn: morningTimeEn,
+    startTime: parseTimeTo24h(morningTimeEn || morningTimeMr),
+    endTime: "09:30",
+    hostWing: day.hostWing || "सर्व इमारती संयुक्त",
+    hostWingEn: day.hostWingEn || day.hostWing || "All Buildings Joint",
+    hostCoordinator: day.hostLead || "",
+    hostCoordinatorEn: day.hostLeadEn || day.hostLead || "",
+    prasad: day.specialPrasad || "",
+    prasadEn: day.specialPrasadEn || day.specialPrasad || "",
+    active: true
+  });
+
+  const eveningTimeEn = day.eveningTimeEn || "08:00 PM";
+  const eveningTimeMr = day.eveningTime || "रात्री ०८:०० वाजता";
+  syntheticEvents.push({
+    id: `legacy_e_${day.dayNumber || dayIndex + 1}`,
+    type: "evening",
+    categoryMr: "संध्याकाळची महाआरती",
+    categoryEn: "Evening Maha Aarti",
+    titleMr: day.eveningRitual || "धूपारती, अथर्वशीर्ष व महाआरती",
+    titleEn: day.eveningRitualEn || day.eveningRitual || "Evening Maha Aarti",
+    time: eveningTimeMr,
+    timeEn: eveningTimeEn,
+    startTime: parseTimeTo24h(eveningTimeEn || eveningTimeMr),
+    endTime: "21:00",
+    hostWing: day.hostWing || "सर्व इमारती संयुक्त",
+    hostWingEn: day.hostWingEn || day.hostWing || "All Buildings Joint",
+    hostCoordinator: day.hostLead || "",
+    hostCoordinatorEn: day.hostLeadEn || day.hostLead || "",
+    prasad: day.specialPrasad || "",
+    prasadEn: day.specialPrasadEn || day.specialPrasad || "",
+    active: true
+  });
+
+  return syntheticEvents;
+};
 
 const AartiCard = () => {
   const { config } = useConfig();
   const { language, t } = useLanguage();
 
-  // If aarti tab is disabled by admin, return null
-  if (config?.tabs?.aarti && !config.tabs.aarti.enabled) {
-    return null;
-  }
+  // 1. MASTER ON/OFF SWITCH CHECK
+  // If either tabs.aarti or dailyAartiSection is disabled by admin, return null
+  const isEnabled = 
+    config?.tabs?.aarti?.enabled !== false && 
+    config?.dailyAartiSection?.enabled !== false;
 
-  const schedule = config?.dailyAartiSchedule || [];
+  const rawSchedule = config?.dailyAartiSchedule || [];
+
   const [activeDayIndex, setActiveDayIndex] = useState(() => {
     const initIdx = (config?.dailyAartiSchedule || []).findIndex((item) => item.isCurrentDay);
     return initIdx !== -1 ? initIdx : 0;
   });
 
-  // Sync active day whenever schedule or isCurrentDay changes in admin config
+  // Sync active day whenever isCurrentDay or schedule changes in admin config
   useEffect(() => {
-    if (schedule && schedule.length > 0) {
-      const currentIdx = schedule.findIndex((item) => item.isCurrentDay);
+    if (rawSchedule && rawSchedule.length > 0) {
+      const currentIdx = rawSchedule.findIndex((item) => item.isCurrentDay);
       if (currentIdx !== -1) {
         setActiveDayIndex(currentIdx);
+      } else if (activeDayIndex >= rawSchedule.length) {
+        setActiveDayIndex(0);
       }
     }
-  }, [config?.dailyAartiSchedule]);
+  }, [rawSchedule]);
 
-  // Daily Countdown Logic for Morning & Evening Aarti
+  // Dynamic Countdown State
   const [countdown, setCountdown] = useState({
-    targetName: "संध्याकाळची महाआरती (Evening Aarti)",
+    targetName: language === "mr" ? "संध्याकाळची महाआरती" : "Evening Maha Aarti",
+    targetTime: language === "mr" ? "रात्री ०८:०० वाजता" : "08:00 PM",
     hours: "00",
     minutes: "00",
     seconds: "00",
-    targetTime: "रात्री ०८:०० वाजता (08:00 PM)"
+    isOngoing: false,
+    allCompleted: false
   });
 
+  // Calculate dynamic countdown in Indian Standard Time (IST)
   useEffect(() => {
+    if (!isEnabled || rawSchedule.length === 0) {
+      return;
+    }
+
     const calculateCountdown = () => {
       const now = new Date();
-      
-      // Target times: Morning 08:30 AM, Evening 08:00 PM (20:00)
-      const morningTarget = new Date();
-      morningTarget.setHours(8, 30, 0, 0);
+      const currentDayIdx = rawSchedule.findIndex((d) => d.isCurrentDay);
+      const baseTodayIdx = currentDayIdx !== -1 ? currentDayIdx : 0;
 
-      const eveningTarget = new Date();
-      eveningTarget.setHours(20, 0, 0, 0);
+      // Build flat list of all events with concrete Date timestamps
+      const eventOccurrences = [];
 
-      let targetDate;
-      let nextAartiName;
-      let nextAartiTime;
+      rawSchedule.forEach((dayItem, dayIdx) => {
+        const events = normalizeDayEvents(dayItem, dayIdx);
+        
+        // Resolve calendar date for this day
+        let dayDateObj;
+        if (dayItem.date && /^\d{4}-\d{2}-\d{2}$/.test(dayItem.date)) {
+          const [y, m, d] = dayItem.date.split("-").map(Number);
+          dayDateObj = new Date(y, m - 1, d);
+        } else {
+          // Relative to today based on index difference
+          const dayDiff = dayIdx - baseTodayIdx;
+          dayDateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayDiff);
+        }
 
-      if (now < morningTarget) {
-        targetDate = morningTarget;
-        nextAartiName = language === "mr" ? "सकाळची महाआरती" : "Morning Maha Aarti";
-        nextAartiTime = language === "mr" ? "सकाळी ०८:३० वाजता" : "08:30 AM";
-      } else if (now < eveningTarget) {
-        targetDate = eveningTarget;
-        nextAartiName = language === "mr" ? "संध्याकाळची महाआरती" : "Evening Maha Aarti";
-        nextAartiTime = language === "mr" ? "रात्री ०८:०० वाजता" : "08:00 PM";
-      } else {
-        // Next day morning aarti
-        const tomorrowMorning = new Date();
-        tomorrowMorning.setDate(tomorrowMorning.getDate() + 1);
-        tomorrowMorning.setHours(8, 30, 0, 0);
-        targetDate = tomorrowMorning;
-        nextAartiName = language === "mr" ? "उद्याची सकाळची आरती" : "Tomorrow's Morning Aarti";
-        nextAartiTime = language === "mr" ? "सकाळी ०८:३० वाजता" : "08:30 AM";
-      }
+        const year = dayDateObj.getFullYear();
+        const month = dayDateObj.getMonth();
+        const dateNum = dayDateObj.getDate();
 
-      const diffMs = targetDate - now;
-      if (diffMs > 0) {
-        const totalSeconds = Math.floor(diffMs / 1000);
+        events.forEach((evt) => {
+          const start24 = parseTimeTo24h(evt.startTime || evt.timeEn || evt.time || "08:30");
+          const end24 = parseTimeTo24h(evt.endTime || "09:30");
+
+          const [sH, sM] = start24.split(":").map(Number);
+          const [eH, eM] = end24.split(":").map(Number);
+
+          const startDate = new Date(year, month, dateNum, sH, sM, 0, 0);
+          let endDate = new Date(year, month, dateNum, eH, eM, 0, 0);
+          if (endDate <= startDate) {
+            // If end time is earlier or same as start time, assume next day or 1 hour duration
+            endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+          }
+
+          eventOccurrences.push({
+            event: evt,
+            day: dayItem,
+            startDate,
+            endDate
+          });
+        });
+      });
+
+      // Filter upcoming vs ongoing
+      const upcoming = eventOccurrences
+        .filter((occ) => occ.startDate.getTime() > now.getTime())
+        .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+      const ongoing = eventOccurrences.find(
+        (occ) => occ.startDate.getTime() <= now.getTime() && occ.endDate.getTime() >= now.getTime()
+      );
+
+      if (upcoming.length > 0) {
+        const nextOcc = upcoming[0];
+        const diffMs = nextOcc.startDate.getTime() - now.getTime();
+
+        const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
 
+        const nextName = language === "mr" 
+          ? (nextOcc.event.categoryMr || nextOcc.event.titleMr || "महाआरती")
+          : (nextOcc.event.categoryEn || nextOcc.event.titleEn || "Maha Aarti");
+
+        const nextTime = language === "mr" 
+          ? (nextOcc.event.time || nextOcc.event.timeEn || "०८:०० PM")
+          : (nextOcc.event.timeEn || nextOcc.event.time || "08:00 PM");
+
         setCountdown({
-          targetName: nextAartiName,
-          targetTime: nextAartiTime,
+          targetName: nextName,
+          targetTime: nextTime,
           hours: String(hours).padStart(2, "0"),
           minutes: String(minutes).padStart(2, "0"),
-          seconds: String(seconds).padStart(2, "0")
+          seconds: String(seconds).padStart(2, "0"),
+          isOngoing: false,
+          allCompleted: false
+        });
+      } else if (ongoing) {
+        const ongoingName = language === "mr" 
+          ? `${ongoing.event.categoryMr || ongoing.event.titleMr || "महाआरती"} (सुरू आहे)`
+          : `${ongoing.event.categoryEn || ongoing.event.titleEn || "Maha Aarti"} (Live Now)`;
+
+        const ongoingTime = language === "mr" 
+          ? (ongoing.event.time || ongoing.event.timeEn || "")
+          : (ongoing.event.timeEn || ongoing.event.time || "");
+
+        setCountdown({
+          targetName: ongoingName,
+          targetTime: ongoingTime,
+          hours: "00",
+          minutes: "00",
+          seconds: "00",
+          isOngoing: true,
+          allCompleted: false
+        });
+      } else {
+        // All scheduled events completed gracefully
+        setCountdown({
+          targetName: language === "mr" ? "सर्व आरत्या संपन्न" : "All Aartis Completed",
+          targetTime: language === "mr" ? "दर्शन सुरू आहे" : "Darshan Live",
+          hours: "00",
+          minutes: "00",
+          seconds: "00",
+          isOngoing: false,
+          allCompleted: true
         });
       }
     };
@@ -93,13 +252,43 @@ const AartiCard = () => {
     calculateCountdown();
     const interval = setInterval(calculateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [language]);
+  }, [isEnabled, rawSchedule, language]);
 
-  if (schedule.length === 0) {
+  // If section is disabled or schedule is empty, render nothing
+  if (!isEnabled || rawSchedule.length === 0) {
     return null;
   }
 
-  const activeDay = schedule[activeDayIndex] || schedule[0];
+  const activeDay = rawSchedule[activeDayIndex] || rawSchedule[0];
+  const activeDayEvents = normalizeDayEvents(activeDay, activeDayIndex);
+
+  // Editable Section Header Texts (with default fallbacks)
+  const sectionConfig = config?.dailyAartiSection || {};
+  const sectionBadge = language === "mr" 
+    ? (sectionConfig.badgeMr || t("aartiTitle")) 
+    : (sectionConfig.badgeEn || t("aartiTitle"));
+
+  const sectionTitle = language === "mr"
+    ? (sectionConfig.titleMr || "दैनिक महाआरती व विंग यजमान")
+    : (sectionConfig.titleEn || "Daily Maha Aarti & Host Wings");
+
+  const sectionSubtitle = language === "mr"
+    ? (sectionConfig.subtitleMr || "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती")
+    : (sectionConfig.subtitleEn || "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal");
+
+  const countdownLabel = language === "mr"
+    ? (sectionConfig.countdownLabelMr || t("nextAartiCountdown"))
+    : (sectionConfig.countdownLabelEn || t("nextAartiCountdown"));
+
+  // Dynamic Day selector label
+  const dayCount = rawSchedule.length;
+  const daySelectorLabel = language === "mr"
+    ? `दिवस निवडा (${dayCount} दिवस वेळापत्रक):`
+    : `SELECT DAY (${dayCount} ${dayCount === 1 ? "DAY" : "DAYS"}):`;
+
+  const activeDayDisplayDate = language === "mr" 
+    ? (activeDay.dateStr || activeDay.dateStrEn || "") 
+    : (activeDay.dateStrEn || activeDay.dateStr || "");
 
   return (
     <section id="aarti" className="scroll-mt-20 my-6">
@@ -110,15 +299,13 @@ const AartiCard = () => {
           <div>
             <div className="inline-flex items-center gap-1.5 text-xs font-black text-maroon-900 bg-gold-200/90 px-3 py-1 rounded-full border border-gold-400">
               <Flame className="w-4 h-4 text-orange-600 animate-diya" />
-              <span>{t("aartiTitle")}</span>
+              <span>{sectionBadge}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-maroon-950 font-heading mt-1.5">
-              {language === "mr" ? "दैनिक महाआरती व विंग यजमान" : "Daily Maha Aarti & Host Wings"}
+              {sectionTitle}
             </h2>
             <p className="text-xs sm:text-sm text-maroon-800 font-medium">
-              {language === "mr" 
-                ? "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती" 
-                : "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal"}
+              {sectionSubtitle}
             </p>
           </div>
         </div>
@@ -134,7 +321,7 @@ const AartiCard = () => {
               <div>
                 <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-gold-300 bg-maroon-800 px-2 py-0.5 rounded-full border border-gold-500/30">
                   <Timer className="w-3 h-3" />
-                  <span>{t("nextAartiCountdown")}</span>
+                  <span>{countdownLabel}</span>
                 </div>
                 <h3 className="text-sm sm:text-base font-bold text-gold-100 mt-0.5">
                   {countdown.targetName} • <span className="text-gold-300">{countdown.targetTime}</span>
@@ -183,27 +370,27 @@ const AartiCard = () => {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-maroon-900 uppercase tracking-wide">
-              {language === "mr" ? "दिवस निवडा (१० दिवस वेळापत्रक):" : "Select Day (10 Days):"}
+              {daySelectorLabel}
             </span>
             <span className="text-xs font-bold text-maroon-700">
-              {activeDay.dateStr}
+              {activeDayDisplayDate}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-            {schedule.map((item, idx) => {
+            {rawSchedule.map((item, idx) => {
               const isSelected = idx === activeDayIndex;
               return (
                 <button
-                  key={idx}
+                  key={item.id || item.dayNumber || idx}
                   onClick={() => setActiveDayIndex(idx)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border whitespace-nowrap ${
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border whitespace-nowrap cursor-pointer ${
                     isSelected
                       ? "bg-maroon-850 text-gold-200 border-gold-500 shadow-sm transform scale-105"
                       : "bg-white text-maroon-950 hover:bg-gold-100 border-gold-300"
                   }`}
                 >
-                  <span className="whitespace-nowrap">{t("day")} {item.dayNumber}</span>
+                  <span className="whitespace-nowrap">{t("day")} {item.dayNumber || idx + 1}</span>
                   {item.isCurrentDay && (
                     <span className="ml-1 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-bold">
                       {language === "mr" ? "आज" : "Today"}
@@ -215,101 +402,106 @@ const AartiCard = () => {
           </div>
         </div>
 
-        {/* 3. SIMPLIFIED TWO-COLUMN AARTI CARDS */}
+        {/* 3. DYNAMIC EVENT CARDS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          
-          {/* Morning Aarti Card */}
-          <div className="bg-white rounded-2xl border-2 border-gold-300 p-4 sm:p-5 shadow-sm hover:border-gold-500 transition flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-900 bg-amber-100 px-3 py-1 rounded-full border border-amber-300">
-                  <Flame className="w-3.5 h-3.5 text-orange-600" />
-                  <span>{t("morningAarti")}</span>
-                </span>
-                <div className="flex items-center gap-1 text-xs font-black text-maroon-900 bg-gold-100 px-2.5 py-1 rounded-lg border border-gold-300">
-                  <Clock className="w-3.5 h-3.5 text-maroon-800" />
-                  <span>{language === "mr" ? activeDay.morningTime : (activeDay.morningTimeEn || activeDay.morningTime)}</span>
+          {activeDayEvents.map((event, eIdx) => {
+            const isEvening = event.type === "evening" || /evening|सायं|संध्या/i.test(event.categoryEn || event.categoryMr || "");
+            const badgeCategory = language === "mr" 
+              ? (event.categoryMr || event.category || t("morningAarti")) 
+              : (event.categoryEn || event.category || t("morningAarti"));
+            
+            const eventTime = language === "mr" 
+              ? (event.time || event.timeEn || "") 
+              : (event.timeEn || event.time || "");
+
+            const eventTitle = language === "mr" 
+              ? (event.titleMr || event.titleEn || "") 
+              : (event.titleEn || event.titleMr || "");
+
+            const hostBuilding = language === "mr" 
+              ? (event.hostWing || event.hostWingEn || "") 
+              : (event.hostWingEn || event.hostWing || "");
+
+            const hostLead = language === "mr" 
+              ? (event.hostCoordinator || event.hostCoordinatorEn || "") 
+              : (event.hostCoordinatorEn || event.hostCoordinator || "");
+
+            const prasadText = language === "mr" 
+              ? (event.prasad || event.prasadEn || "") 
+              : (event.prasadEn || event.prasad || "");
+
+            const descriptionText = language === "mr"
+              ? (event.descriptionMr || event.descriptionEn || "")
+              : (event.descriptionEn || event.descriptionMr || "");
+
+            return (
+              <div 
+                key={event.id || eIdx}
+                className="bg-white rounded-2xl border-2 border-gold-300 p-4 sm:p-5 shadow-sm hover:border-gold-500 transition flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    {isEvening ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-maroon-900 bg-rose-100 px-3 py-1 rounded-full border border-rose-300">
+                        <Sparkles className="w-3.5 h-3.5 text-rose-700" />
+                        <span>{badgeCategory}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-900 bg-amber-100 px-3 py-1 rounded-full border border-amber-300">
+                        <Flame className="w-3.5 h-3.5 text-orange-600" />
+                        <span>{badgeCategory}</span>
+                      </span>
+                    )}
+
+                    {eventTime && (
+                      <div className="flex items-center gap-1 text-xs font-black text-maroon-900 bg-gold-100 px-2.5 py-1 rounded-lg border border-gold-300">
+                        <Clock className="w-3.5 h-3.5 text-maroon-800" />
+                        <span>{eventTime}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <h4 className="text-base sm:text-lg font-bold text-maroon-950 font-heading mb-1.5">
+                    {eventTitle}
+                  </h4>
+
+                  {descriptionText && (
+                    <p className="text-xs text-stone-600 mb-2">
+                      {descriptionText}
+                    </p>
+                  )}
+
+                  <div className="space-y-1.5 text-xs sm:text-sm text-gray-700 mt-3 pt-3 border-t border-gray-100">
+                    {hostBuilding && (
+                      <p className="flex items-center gap-2">
+                        <Building className="w-4 h-4 text-maroon-700 flex-shrink-0" />
+                        <span>
+                          <strong>{t("hostWing")}:</strong> {hostBuilding}
+                        </span>
+                      </p>
+                    )}
+                    {hostLead && (
+                      <p className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                        <span>
+                          <strong>{t("hostRepresentative")}:</strong> {hostLead}
+                        </span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <h4 className="text-base sm:text-lg font-bold text-maroon-950 font-heading mb-1.5">
-                {language === "mr" ? activeDay.morningRitual : (activeDay.morningRitualEn || activeDay.morningRitual)}
-              </h4>
-
-              <div className="space-y-1.5 text-xs sm:text-sm text-gray-700 mt-3 pt-3 border-t border-gray-100">
-                <p className="flex items-center gap-2">
-                  <Building className="w-4 h-4 text-maroon-700 flex-shrink-0" />
-                  <span>
-                    <strong>{t("hostWing")}:</strong> {language === "mr" ? activeDay.hostWing : (activeDay.hostWingEn || activeDay.hostWing)}
-                  </span>
-                </p>
-                {activeDay.hostLead && (
-                  <p className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                    <span>
-                      <strong>{t("hostRepresentative")}:</strong> {language === "mr" ? activeDay.hostLead : (activeDay.hostLeadEn || activeDay.hostLead)}
+                {prasadText && (
+                  <div className="mt-4 pt-3 border-t border-gold-200/60 flex items-center justify-between text-xs text-maroon-900 font-semibold bg-gold-50/60 p-2.5 rounded-xl">
+                    <span>{language === "mr" ? "नैवेद्य / प्रसाद:" : "Offering / Prasad:"}</span>
+                    <span className="font-bold text-maroon-950">
+                      {prasadText}
                     </span>
-                  </p>
+                  </div>
                 )}
               </div>
-            </div>
-
-            {activeDay.specialPrasad && (
-              <div className="mt-4 pt-3 border-t border-gold-200/60 flex items-center justify-between text-xs text-maroon-900 font-semibold bg-gold-50/60 p-2.5 rounded-xl">
-                <span>{language === "mr" ? "नैवेद्य / प्रसाद:" : "Offering / Prasad:"}</span>
-                <span className="font-bold text-maroon-950">
-                  {language === "mr" ? activeDay.specialPrasad : (activeDay.specialPrasadEn || activeDay.specialPrasad)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Evening Aarti Card */}
-          <div className="bg-white rounded-2xl border-2 border-gold-300 p-4 sm:p-5 shadow-sm hover:border-gold-500 transition flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-maroon-900 bg-rose-100 px-3 py-1 rounded-full border border-rose-300">
-                  <Sparkles className="w-3.5 h-3.5 text-rose-700" />
-                  <span>{t("eveningAarti")}</span>
-                </span>
-                <div className="flex items-center gap-1 text-xs font-black text-maroon-900 bg-gold-100 px-2.5 py-1 rounded-lg border border-gold-300">
-                  <Clock className="w-3.5 h-3.5 text-maroon-800" />
-                  <span>{language === "mr" ? activeDay.eveningTime : (activeDay.eveningTimeEn || activeDay.eveningTime)}</span>
-                </div>
-              </div>
-
-              <h4 className="text-base sm:text-lg font-bold text-maroon-950 font-heading mb-1.5">
-                {language === "mr" ? activeDay.eveningRitual : (activeDay.eveningRitualEn || activeDay.eveningRitual)}
-              </h4>
-
-              <div className="space-y-1.5 text-xs sm:text-sm text-gray-700 mt-3 pt-3 border-t border-gray-100">
-                <p className="flex items-center gap-2">
-                  <Building className="w-4 h-4 text-maroon-700 flex-shrink-0" />
-                  <span>
-                    <strong>{t("hostWing")}:</strong> {language === "mr" ? activeDay.hostWing : (activeDay.hostWingEn || activeDay.hostWing)}
-                  </span>
-                </p>
-                {activeDay.hostLead && (
-                  <p className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                    <span>
-                      <strong>{t("hostRepresentative")}:</strong> {language === "mr" ? activeDay.hostLead : (activeDay.hostLeadEn || activeDay.hostLead)}
-                    </span>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {activeDay.specialPrasad && (
-              <div className="mt-4 pt-3 border-t border-gold-200/60 flex items-center justify-between text-xs text-maroon-900 font-semibold bg-gold-50/60 p-2.5 rounded-xl">
-                <span>{language === "mr" ? "नैवेद्य / प्रसाद:" : "Offering / Prasad:"}</span>
-                <span className="font-bold text-maroon-950">
-                  {language === "mr" ? activeDay.specialPrasad : (activeDay.specialPrasadEn || activeDay.specialPrasad)}
-                </span>
-              </div>
-            )}
-          </div>
-
+            );
+          })}
         </div>
 
       </div>

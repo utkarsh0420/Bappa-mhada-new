@@ -252,15 +252,20 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
   // Handle saving (Create or Update) Event
   const handleSaveEvent = async (e) => {
     e.preventDefault();
-    if (!eventFormData.titleMr) {
+    if (!eventFormData.titleMr && !eventFormData.titleEn) {
       alert(language === "mr" ? "कृपया कार्यक्रमाचे शीर्षक प्रविष्ट करा" : "Please enter event title");
       return;
     }
     setIsSubmitting(true);
     try {
+      const payload = {
+        ...eventFormData,
+        titleMr: eventFormData.titleMr || eventFormData.titleEn,
+        titleEn: eventFormData.titleEn || eventFormData.titleMr
+      };
       if (editingEvent && (editingEvent.id || editingEvent._id)) {
         const id = editingEvent.id || editingEvent._id;
-        const res = await API.put(`/events/${id}`, eventFormData);
+        const res = await API.put(`/events/${id}`, payload);
         if (res.data?.success) {
           showToast(language === "mr" ? "कार्यक्रम यशस्वीरीत्या अद्ययावत केला!" : "Event updated successfully!", "success");
           setIsFormOpen(false);
@@ -268,7 +273,7 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
           triggerLiveSync("events");
         }
       } else {
-        const res = await API.post("/events", eventFormData);
+        const res = await API.post("/events", payload);
         if (res.data?.success) {
           showToast(language === "mr" ? "नवीन कार्यक्रम कॅलेंडरमध्ये जोडला गेला!" : "New event added to calendar!", "success");
           setIsFormOpen(false);
@@ -278,7 +283,8 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
       }
     } catch (err) {
       console.error("Save event error:", err);
-      showToast(language === "mr" ? "कार्यक्रम जतन करताना त्रुटी आली" : "Failed to save event", "error");
+      const msg = err.response?.data?.message || err.message || (language === "mr" ? "कार्यक्रम जतन करताना त्रुटी आली" : "Failed to save event");
+      showToast(msg, "error");
     } finally {
       setIsSubmitting(false);
     }

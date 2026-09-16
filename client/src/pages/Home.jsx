@@ -10,7 +10,6 @@ import { subscribeLiveSync } from "../utils/liveSync";
 
 import MarqueeTicker from "../components/MarqueeTicker";
 import DailyNewsletter from "../components/DailyNewsletter";
-import EventScroller from "../components/EventScroller";
 import AartiCard from "../components/AartiCard";
 import TenDaysSchedule from "../components/TenDaysSchedule";
 import MahaprasadCard from "../components/MahaprasadCard";
@@ -18,7 +17,6 @@ import VisarjanCard from "../components/VisarjanCard";
 import UpcomingEvents from "../components/UpcomingEvents";
 import PhotoGallery from "../components/PhotoGallery";
 import MandalRules from "../components/MandalRules";
-import EmergencyContacts from "../components/EmergencyContacts";
 import AboutMandal from "../components/AboutMandal";
 
 const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
@@ -26,22 +24,15 @@ const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
   const { language, t } = useLanguage();
 
   const [selectedWing, setSelectedWing] = useState("All");
-  const [activeCategory, setActiveCategory] = useState("all");
-  const [events, setEvents] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
-  const [contacts, setContacts] = useState([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
 
   useEffect(() => {
-    fetchEvents();
     fetchAnnouncements();
-    fetchContacts();
 
     // Live Cross-Component / Cross-Tab Sync Subscription
     const unsubscribe = subscribeLiveSync(({ entity }) => {
-      if (entity === "events" || entity === "all") fetchEvents();
       if (entity === "announcements" || entity === "all") fetchAnnouncements();
-      if (entity === "contacts" || entity === "all") fetchContacts();
       if (entity === "config" || entity === "all") {
         if (typeof refreshConfig === "function") refreshConfig();
       }
@@ -49,16 +40,12 @@ const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
 
     // Background periodic poll every 15s so changes made by other admins reflect immediately
     const pollInterval = setInterval(() => {
-      fetchEvents();
       fetchAnnouncements();
-      fetchContacts();
     }, 15000);
 
     // Refresh instantly when user tabs back to this window
     const handleFocus = () => {
-      fetchEvents();
       fetchAnnouncements();
-      fetchContacts();
       if (typeof refreshConfig === "function") refreshConfig();
     };
     window.addEventListener("focus", handleFocus);
@@ -68,20 +55,7 @@ const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
       clearInterval(pollInterval);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [selectedWing, activeCategory]);
-
-  const fetchEvents = async () => {
-    try {
-      const params = {};
-      if (activeCategory !== "all") params.category = activeCategory;
-      const res = await API.get("/events", { params });
-      if (res.data.success) {
-        setEvents(res.data.data);
-      }
-    } catch (err) {
-      console.error("Events fetch error:", err);
-    }
-  };
+  }, [selectedWing]);
 
   const fetchAnnouncements = async () => {
     try {
@@ -96,24 +70,13 @@ const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
     }
   };
 
-  const fetchContacts = async () => {
-    try {
-      const res = await API.get("/contacts");
-      if (res.data.success) {
-        setContacts(res.data.data);
-      }
-    } catch (err) {
-      console.error("Contacts fetch error:", err);
-    }
-  };
-
   const latestPinned = announcements.find((a) => a.isPinned) || announcements[0];
 
   return (
     <div id="top-section" className="w-full">
       
       {/* 1. Breaking Marquee Scroller */}
-      {config?.tabs?.announcements?.enabled !== false && (
+      {config?.marqueeActive !== false && (
         <div id="marquee-section" className="scroll-mt-16">
           <MarqueeTicker
             latestAnnouncement={latestPinned}
@@ -126,19 +89,8 @@ const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
 
 
       {/* 2. DAILY DIGITAL NEWSLETTER BANNER */}
-      {config?.tabs?.newsletter?.enabled !== false && (
+      {config?.tabs?.newsletter?.enabled !== false && config?.newsletter?.enabled !== false && (
         <DailyNewsletter />
-      )}
-
-      {/* 4. Event Scroller */}
-      {config?.tabs?.cultural?.enabled !== false && (
-        <div id="events-section" className="scroll-mt-16">
-          <EventScroller
-            events={events}
-            activeCategory={activeCategory}
-            onSelectCategory={(cat) => setActiveCategory(cat)}
-          />
-        </div>
       )}
 
       {/* 5. Main Content Sections */}
@@ -185,11 +137,6 @@ const Home = ({ onOpenSidebar, onOpenUpcomingCalendar }) => {
           <div id="rules-section">
             <MandalRules />
           </div>
-        )}
-
-        {/* EMERGENCY CONTACTS & SOCIETY EMAIL */}
-        {config?.tabs?.contacts?.enabled !== false && (
-          <EmergencyContacts contacts={contacts} />
         )}
 
         {/* MANDAL INFO, COMMITTEE & PILLARS */}

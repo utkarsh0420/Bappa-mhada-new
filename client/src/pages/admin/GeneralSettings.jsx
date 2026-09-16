@@ -9,7 +9,7 @@ import {
 } from "./FestiveControls";
 import { useLanguage } from "../../context/LanguageContext";
 
-const GeneralSettings = ({ config, onSaveGeneral }) => {
+const GeneralSettings = ({ config, onSaveGeneral, onSwitchTab }) => {
   const { language } = useLanguage();
   const isEn = language === "en";
 
@@ -125,43 +125,32 @@ const GeneralSettings = ({ config, onSaveGeneral }) => {
           </div>
         </div>
 
-        {/* Marquee Ticker Section */}
-        <div className="space-y-3 p-4 sm:p-5 bg-gradient-to-br from-[#FFFDF9] via-[#FAF5EC] to-white rounded-2xl border-1.5 border-gold-300/80 shadow-xs">
-          <div className="flex items-center gap-2 pb-2 border-b border-gold-200">
-            <Megaphone className="w-4 h-4 text-amber-700" />
-            <span className="text-xs font-black text-maroon-950 uppercase tracking-wider font-heading">
-              {isEn ? "Top Marquee Ticker Message" : "वेबसाईटच्या वर धावणारा स्क्रोलर मजकूर (Marquee Ticker)"}
-            </span>
-          </div>
-
-          <FestiveTextarea
-            label={isEn ? "Marquee Ticker Text" : "स्क्रोलर मजकूर (Marquee Text)"}
-            rows={3}
-            value={form.marqueeText}
-            onChange={(e) => setForm({ ...form, marqueeText: e.target.value })}
-            placeholder="उदा. 🚩 म्हाडा टॉवर्स गणेशोत्सव २०२५ मध्ये सर्व भाविकांचे हार्दिक स्वागत!..."
-            helperText={
-              isEn 
-                ? "This text continuously scrolls across the top golden ribbon of the website." 
-                : "हा मजकूर वेबसाईटच्या सर्वात वर लाल-सुनेहरी रंगाच्या पट्टीवर सतत स्क्रोल होत राहील."
-            }
-          />
-
-          {/* Live Preview Box */}
-          <div>
-            <span className="text-[11px] font-bold text-stone-600 block mb-1">
-              {isEn ? "Live Website Preview:" : "थेट पूर्वावलोकन (Live Preview on Website):"}
-            </span>
-            <div className="bg-gradient-to-r from-maroon-950 via-maroon-900 to-maroon-950 text-gold-200 p-2.5 rounded-xl border border-gold-400/80 overflow-hidden shadow-inner flex items-center gap-2 text-xs">
-              <span className="bg-gold-400 text-maroon-950 font-black text-[10px] px-2 py-0.5 rounded-full uppercase flex items-center gap-1 flex-shrink-0">
-                <Flame className="w-3 h-3 text-orange-600 flex-shrink-0" />
-                {isEn ? "LIVE ALERT" : "ताजी सूचना"}
+        {/* Dynamic Scroller Hub Link */}
+        <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50/80 via-white to-gold-50/40 rounded-2xl border-2 border-gold-400 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-amber-600 animate-diya-flicker fill-amber-300" />
+              <span className="text-xs sm:text-sm font-black text-maroon-950 uppercase tracking-wider font-heading">
+                {isEn ? "Dynamic Important Update Scroller" : "महत्वाचे अपडेट स्क्रोलर (Dynamic Scroller Hub)"}
               </span>
-              <p className="truncate font-semibold text-gold-100 min-w-0 flex-1">
-                {form.marqueeText || (isEn ? "Ticker text will appear here..." : "मजकूर येथे दिसेल...")}
-              </p>
             </div>
+            <p className="text-xs text-stone-600 leading-tight">
+              {isEn 
+                ? "Add, Edit, Delete, Reorder, Enable/Disable, and Schedule multiple scrolling announcements." 
+                : "सर्व धावणाऱ्या सूचना जोडणे, संपादित करणे, क्रम बदलणे, सुरू/बंद करणे व वेळापत्रक ठरवण्यासाठी व्यवस्थापक वापरा."}
+            </p>
           </div>
+          {onSwitchTab && (
+            <FestiveButton
+              type="button"
+              onClick={() => onSwitchTab("scroller")}
+              icon={Flame}
+              variant="primary"
+              size="sm"
+            >
+              {isEn ? "Manage Scroller Messages →" : "स्क्रोलर संदेश व्यवस्थापित करा →"}
+            </FestiveButton>
+          )}
         </div>
 
         {/* Festival Status & Helpline */}

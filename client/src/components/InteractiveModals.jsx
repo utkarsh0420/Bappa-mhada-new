@@ -330,14 +330,14 @@ export const FestivalGalleryModal = ({ isOpen, onClose }) => {
   const { config } = useConfig();
   if (!isOpen) return null;
 
-  const gallery = config?.gallery || [];
+  const gallery = (config?.gallery || []).filter(f => f.isActive !== false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
       <div className="bg-white rounded-3xl max-w-2xl w-full border-2 border-gold-400 p-6 shadow-2xl relative animate-fadeIn max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+          className="absolute top-4 right-4 p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
@@ -353,33 +353,43 @@ export const FestivalGalleryModal = ({ isOpen, onClose }) => {
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {gallery.map((item, idx) => (
-            <div key={item.id || idx} className="rounded-2xl border border-gold-300 p-3 bg-gradient-to-br from-[#FFFDF9] to-[#FAF5EC] shadow-xs">
-              {item.imageUrl ? (
-                <div className="h-36 rounded-xl overflow-hidden mb-2 relative bg-black">
-                  <img src={item.imageUrl} alt={item.titleMr} className="w-full h-full object-cover" />
-                  {item.category && (
-                    <span className="absolute top-2 right-2 text-[9px] bg-amber-500 text-maroon-950 font-black px-2 py-0.5 rounded-full">
-                      {item.category}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="h-32 rounded-xl bg-maroon-950 flex flex-col items-center justify-center text-gold-300 mb-2 relative overflow-hidden">
-                  <Sparkles className="w-8 h-8 text-gold-400 mb-1 animate-pulse" />
-                  <span className="text-[11px] font-bold text-center px-2">{language === "mr" ? item.titleMr : (item.titleEn || item.titleMr)}</span>
-                  {item.category && (
-                    <span className="absolute top-2 right-2 text-[9px] bg-amber-500 text-maroon-950 font-black px-2 py-0.5 rounded-full">
-                      {item.category}
-                    </span>
-                  )}
-                </div>
-              )}
-              <p className="text-xs font-bold text-maroon-950 truncate">
-                {language === "mr" ? item.titleMr : (item.titleEn || item.titleMr)}
-              </p>
-            </div>
-          ))}
+          {gallery.map((item, idx) => {
+            const banner = item.bannerUrl || item.imageUrl;
+            const title = language === "mr" ? (item.nameMr || item.titleMr) : (item.nameEn || item.titleEn || item.titleMr);
+            const count = item.photos?.length || 0;
+            return (
+              <div key={item.id || idx} className="rounded-2xl border border-gold-300 p-3 bg-gradient-to-br from-[#FFFDF9] to-[#FAF5EC] shadow-xs">
+                {banner ? (
+                  <div className="h-36 rounded-xl overflow-hidden mb-2 relative bg-black">
+                    <img src={banner} alt={title} className="w-full h-full object-cover" />
+                    {item.category && (
+                      <span className="absolute top-2 right-2 text-[9px] bg-amber-500 text-maroon-950 font-black px-2 py-0.5 rounded-full">
+                        {item.category}
+                      </span>
+                    )}
+                    {count > 0 && (
+                      <span className="absolute bottom-2 right-2 text-[9px] bg-black/60 text-gold-200 font-bold px-2 py-0.5 rounded-full">
+                        {count} {language === "mr" ? "फोटो" : "Photos"}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-32 rounded-xl bg-maroon-950 flex flex-col items-center justify-center text-gold-300 mb-2 relative overflow-hidden">
+                    <Sparkles className="w-8 h-8 text-gold-400 mb-1 animate-pulse" />
+                    <span className="text-[11px] font-bold text-center px-2">{title}</span>
+                    {item.category && (
+                      <span className="absolute top-2 right-2 text-[9px] bg-amber-500 text-maroon-950 font-black px-2 py-0.5 rounded-full">
+                        {item.category}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs font-bold text-maroon-950 truncate">
+                  {title}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

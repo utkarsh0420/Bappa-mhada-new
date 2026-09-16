@@ -198,7 +198,27 @@ router.post("/multiple", (req, res) => {
  */
 router.get("/list", async (req, res) => {
   try {
-    const mediaList = await Media.find().sort({ createdAt: -1 }).limit(50);
+    if (mongoose.connection.readyState === 1) {
+      const mediaList = await Media.find().sort({ createdAt: -1 }).limit(50);
+      return res.status(200).json({
+        success: true,
+        media: mediaList,
+      });
+    }
+
+    // Fallback: Read uploaded files from uploads directory
+    if (!fs.existsSync(uploadsDir)) {
+      return res.status(200).json({ success: true, media: [] });
+    }
+
+    const files = fs.readdirSync(uploadsDir);
+    const mediaList = files.map((file) => ({
+      filename: file,
+      url: `/uploads/${file}`,
+      imageUrl: `/uploads/${file}`,
+      category: "general"
+    }));
+
     return res.status(200).json({
       success: true,
       media: mediaList,
@@ -228,7 +248,9 @@ router.delete("/:filename", async (req, res) => {
       fs.unlinkSync(filePath);
     }
 
-    await Media.deleteOne({ filename: safeFilename });
+    if (mongoose.connection.readyState === 1) {
+      await Media.deleteOne({ filename: safeFilename }).catch(() => {});
+    }
 
     return res.status(200).json({
       success: true,

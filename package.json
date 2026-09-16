@@ -1,8 +1,11 @@
-﻿{
+{
   "name": "mhada-towers-utsav-mandal",
   "version": "1.0.0",
   "description": "MHADA Towers Utsav Mandal - Ganpati Digital Information Hub (MERN Stack)",
+  "type": "module",
   "scripts": {
+    "dev": "node dev.js",
+    "start": "node dev.js",
     "server": "cd server && npm start",
     "client": "cd client && npm run dev",
     "build": "cd client && npm run build",

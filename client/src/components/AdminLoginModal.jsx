@@ -173,9 +173,21 @@ const AdminLoginModal = ({ isOpen, onClose, onSuccess }) => {
 
           {/* Helper Credentials Hint */}
           <div className="mt-4 p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-maroon-900">
-            <span className="font-bold">प्रात्यक्षिक प्रवेश माहिती:</span>
-            <div className="text-gray-600">ईमेल: <code className="text-maroon-850 font-semibold">mhadatowersutsavmandal@gmail.com</code></div>
-            <div className="text-gray-600">पासवर्ड: <code className="text-maroon-850 font-semibold">MhadaGanpati@2025</code></div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-bold">प्रात्यक्षिक प्रवेश माहिती (Demo Login):</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("mhadatowersutsavmandal@gmail.com");
+                  setPassword("MhadaGanpati@2025");
+                }}
+                className="text-[10px] bg-amber-200/70 hover:bg-amber-300 text-maroon-900 font-bold px-2 py-0.5 rounded transition cursor-pointer"
+              >
+                माहिती भरा (Auto Fill)
+              </button>
+            </div>
+            <div className="text-gray-600">ईमेल: <code onClick={() => setEmail("mhadatowersutsavmandal@gmail.com")} className="text-maroon-850 font-semibold cursor-pointer hover:underline">mhadatowersutsavmandal@gmail.com</code></div>
+            <div className="text-gray-600">पासवर्ड: <code onClick={() => setPassword("MhadaGanpati@2025")} className="text-maroon-850 font-semibold cursor-pointer hover:underline">MhadaGanpati@2025</code></div>
           </div>
 
         </div>

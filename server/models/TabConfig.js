@@ -42,7 +42,21 @@ const dailyAartiItemSchema = new mongoose.Schema({
   specialPrasadEn: { type: String, default: "" },
   cultural: { type: String, default: "" },
   culturalEn: { type: String, default: "" },
+  date: { type: String, default: "" },
+  events: { type: [mongoose.Schema.Types.Mixed], default: [] },
   isCurrentDay: { type: Boolean, default: false }
+}, { _id: false, strict: false });
+
+const dailyAartiSectionSchema = new mongoose.Schema({
+  enabled: { type: Boolean, default: true },
+  badgeMr: { type: String, default: "दैनिक महाआरती व यजमान" },
+  badgeEn: { type: String, default: "Daily Maha Aarti & Host Wings" },
+  titleMr: { type: String, default: "दैनिक महाआरती व विंग यजमान" },
+  titleEn: { type: String, default: "Daily Maha Aarti & Host Wings" },
+  subtitleMr: { type: String, default: "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती" },
+  subtitleEn: { type: String, default: "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal" },
+  countdownLabelMr: { type: String, default: "पुढील महाआरतीसाठी शिल्लक वेळ" },
+  countdownLabelEn: { type: String, default: "Time Remaining Until Next Aarti" }
 }, { _id: false, strict: false });
 
 const festivalScheduleCardSchema = new mongoose.Schema({
@@ -90,6 +104,14 @@ const newsletterSchema = new mongoose.Schema({
   todaysHighlights: { type: [String], default: [] },
   yesterdayHighlights: { type: [String], default: [] },
   prasadSpecial: { type: String, default: "" },
+  displayStyle: { type: String, default: "classic" },
+  bulletinTitle: { type: String, default: "DAILY DIGITAL BULLETIN" },
+  bulletinTitleMr: { type: String, default: "दैनिक डिजिटल वृत्तपत्र" },
+  eventDuration: { type: String, default: "1 day event" },
+  eventDurationMr: { type: String, default: "१ दिवसीय सोहळा" },
+  festivalName: { type: String, default: "Ganesh Utsav - 16 Sep" },
+  festivalNameMr: { type: String, default: "गणेश उत्सव - १६ सप्टेंबर" },
+  days: { type: [mongoose.Schema.Types.Mixed], default: [] },
   enabled: { type: Boolean, default: true }
 }, { _id: false, strict: false });
 
@@ -111,19 +133,33 @@ const ruleItemSchema = new mongoose.Schema({
   icon: { type: String, default: "ShieldCheck" }
 }, { _id: false });
 
+const festivalPhotoSchema = new mongoose.Schema({
+  id: { type: String, default: "" },
+  url: { type: String, required: true },
+  captionMr: { type: String, default: "" },
+  captionEn: { type: String, default: "" },
+  order: { type: Number, default: 0 }
+}, { _id: false, strict: false });
+
 const galleryItemSchema = new mongoose.Schema({
   id: { type: String, required: true },
   titleMr: { type: String, required: true },
   titleEn: { type: String, default: "" },
-  category: { type: String, default: "मूर्ती व प्रतिष्ठापना" },
-  categoryEn: { type: String, default: "Murti & Sthapana" },
-  year: { type: String, default: "२०२५" },
-  yearEn: { type: String, default: "2025" },
+  nameMr: { type: String, default: "" },
+  nameEn: { type: String, default: "" },
+  category: { type: String, default: "महाआरती" },
+  categoryEn: { type: String, default: "Maha Aarti" },
+  year: { type: String, default: "२०२६" },
+  yearEn: { type: String, default: "2026" },
   descMr: { type: String, default: "" },
   descEn: { type: String, default: "" },
   accentColor: { type: String, default: "from-amber-700 to-maroon-900" },
-  imageUrl: { type: String, default: "" }
-}, { _id: false });
+  bannerUrl: { type: String, default: "" },
+  imageUrl: { type: String, default: "" },
+  photos: { type: [festivalPhotoSchema], default: [] },
+  isActive: { type: Boolean, default: true },
+  order: { type: Number, default: 0 }
+}, { _id: false, strict: false });
 
 const pollOptionSchema = new mongoose.Schema({
   id: { type: Number, required: true },
@@ -260,6 +296,18 @@ const mandalInfoSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const scrollerMessageSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  text: { type: String, required: true },
+  textMr: { type: String, default: "" },
+  textEn: { type: String, default: "" },
+  isActive: { type: Boolean, default: true },
+  order: { type: Number, default: 0 },
+  startDate: { type: String, default: "" },
+  endDate: { type: String, default: "" },
+  createdAt: { type: Date, default: Date.now }
+}, { _id: false, strict: false });
+
 const tabConfigSchema = new mongoose.Schema({
   mandalNameMr: { type: String, default: "म्हाडा टॉवर्स उत्सव मंडळ" },
   mandalNameEn: { type: String, default: "MHADA Towers Utsav Mandal" },
@@ -272,6 +320,43 @@ const tabConfigSchema = new mongoose.Schema({
     default: "गणपती बाप्पा मोरया! दैनिक महाआरती सकाळी ८:३० व रात्री ८:०० वाजता | आजची महाआरती इमारत G विंग यजमान | सर्व भाविकांनी आरतीला उपस्थित राहावे."
   },
   marqueeActive: { type: Boolean, default: true },
+  scrollerMessages: {
+    type: [scrollerMessageSchema],
+    default: [
+      {
+        id: "msg_1",
+        text: "7:30 PM. Kindly arrive 10 minutes earlier.",
+        textMr: "संध्या. ७:३० वाजता. कृपया १० मिनिटे आधी यावे.",
+        textEn: "7:30 PM. Kindly arrive 10 minutes earlier.",
+        isActive: true,
+        order: 1
+      },
+      {
+        id: "msg_2",
+        text: "All 5 Buildings (G • H • J • K • I) • MHADA Towers",
+        textMr: "सर्व ५ इमारती (G • H • J • K • I) • म्हाडा टॉवर्स",
+        textEn: "All 5 Buildings (G • H • J • K • I) • MHADA Towers",
+        isActive: true,
+        order: 2
+      },
+      {
+        id: "msg_3",
+        text: "Daily Maha Aarti: 08:30 AM & 08:00 PM",
+        textMr: "दैनिक महाआरती: सकाळी ८:३० व रात्री ८:०० वाजता",
+        textEn: "Daily Maha Aarti: 08:30 AM & 08:00 PM",
+        isActive: true,
+        order: 3
+      },
+      {
+        id: "msg_4",
+        text: "Shree Ganeshotsav 2026 • Digital Information Center",
+        textMr: "श्री गणेशोत्सव २०२६ • डिजिटल माहिती केंद्र",
+        textEn: "Shree Ganeshotsav 2026 • Digital Information Center",
+        isActive: true,
+        order: 4
+      }
+    ]
+  },
   participatingWings: {
     type: [String],
     default: ["G", "H", "J", "K"]
@@ -778,6 +863,10 @@ const tabConfigSchema = new mongoose.Schema({
   },
   festivalScheduleCard: {
     type: festivalScheduleCardSchema,
+    default: () => ({})
+  },
+  dailyAartiSection: {
+    type: dailyAartiSectionSchema,
     default: () => ({})
   },
   updatedAt: { type: Date, default: Date.now }

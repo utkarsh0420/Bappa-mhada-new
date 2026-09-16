@@ -100,43 +100,88 @@ const getMandalFooter = () => {
   return `━━━━━━━━━━━━━━━━━━━━━━\n🏢 *सहभागी ४ इमारती:* G (नंदादेवी) • H (निलगिरी) • J (पूर्वांचल) • K (गोवर्धन)\n🙏 *गणपती बाप्पा मोरया, मंगलमूर्ती मोरया!* 🌸`;
 };
 
-// 1. Daily Newsletter Broadcast Formatter (Fully dynamic with 10-day schedule)
+// 1. Daily Newsletter Broadcast Formatter (Fully dynamic with blocks and days)
 export const formatNewsletterBroadcast = (newsletter, config, specificDay = null) => {
   const nl = newsletter || config?.newsletter || {};
-  const schedule = config?.dailyAartiSchedule || config?.tenDaysAartiSchedule || [];
+  const daysList = (nl.days && Array.isArray(nl.days) && nl.days.length > 0)
+    ? nl.days
+    : (config?.dailyAartiSchedule || config?.tenDaysAartiSchedule || []);
   
   // Find current day from schedule or use passed specificDay
-  const activeDay = specificDay || schedule.find((d) => d.isCurrentDay) || schedule[0] || {};
+  const activeDay = specificDay || daysList.find((d) => d.isCurrentDay) || daysList[0] || {};
 
-  const dayNum = activeDay.dayNumber ? `दिवस ${activeDay.dayNumber}` : "आज";
-  const dateStr = activeDay.dateStr || nl.dateStr || "आज";
-  const edition = nl.edition || `दैनिक डिजिटल उत्सव बुलेटिन (${dayNum})`;
-  const headline = nl.headline || activeDay.tithi || "आजचा उत्सव वृत्तांत";
-  const subheadline = nl.subheadline || activeDay.morningRitual || "";
-  const hostWing = activeDay.hostWing || nl.todaysHostWing || "सर्व ४ विंग्ज (G, H, J, K)";
-  const hostLead = activeDay.hostLead || nl.hostLead || "";
-  const morningTime = activeDay.morningTime || "सकाळी ०८:३०";
-  const morningRitual = activeDay.morningRitual || activeDay.ritual || "महापूजा";
-  const eveningTime = activeDay.eveningTime || nl.eveningAartiTime || "रात्री ०८:००";
-  const eveningRitual = activeDay.eveningRitual || activeDay.cultural || "महाआरती";
-  const specialPrasad = activeDay.specialPrasad || nl.prasadSpecial || "";
-  const cultural = activeDay.cultural || "";
-  const safetyTip = nl.safetyTip || "संकुल २४x७ सीसीटीव्ही निगराणीखाली आहे. दर्शन रांगेत शिस्त बाळगावी.";
-  const specialNote = nl.specialNote || "";
+  const dayNum = activeDay.dayNumber ? `Day ${activeDay.dayNumber}` : "Today";
+  const dateStr = activeDay.dateStr || activeDay.dateStrEn || nl.dateStr || "Today";
+  const bulletinTitle = nl.bulletinTitle || "DAILY DIGITAL BULLETIN";
+  const eventDuration = nl.eventDuration || "1 day event";
+  const festivalLabel = activeDay.festivalDayLabel || activeDay.festivalName || nl.festivalName || `${dayNum}`;
+  const headline = activeDay.headline || nl.headline || "Ganpati Festival Live";
+  const subheadline = activeDay.subtitle || nl.subheadline || "All 5 wings are participated";
+  const safetyTip = nl.safetyTip || "Please park vehicles only in designated spots.";
+
+  let contentSections = "";
+
+  if (Array.isArray(activeDay.blocks) && activeDay.blocks.length > 0) {
+    const activeBlocks = activeDay.blocks
+      .filter((b) => b.isActive !== false)
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+
+    const renderedBlocks = activeBlocks.map((blk) => {
+      let icon = "📌";
+      if (blk.category === "aarti") icon = "🪔";
+      else if (blk.category === "host") icon = "🏛️";
+      else if (blk.category === "prasad") icon = "🍬";
+      else if (blk.category === "cultural" || blk.category === "event") icon = "🎭";
+      else if (blk.category === "competition") icon = "🏆";
+      else if (blk.category === "parking") icon = "🚗";
+      else if (blk.category === "safety") icon = "🛡️";
+
+      let blockText = `${icon} *${blk.title || "माहिती"}*`;
+      if (blk.time) blockText += ` [${blk.time}]`;
+
+      if (Array.isArray(blk.items) && blk.items.length > 0) {
+        const itemLines = blk.items.map(it => `  • ${it.label || ""} ${it.time ? `*${it.time}*` : ""} ${it.desc ? `— ${it.desc}` : ""}`).join("\n");
+        blockText += `\n${itemLines}`;
+      } else {
+        if (blk.subtitle) blockText += `\n  ${blk.subtitle}`;
+        if (blk.description && blk.description !== blk.subtitle) blockText += `\n  ${blk.description}`;
+        if (blk.hostCoordinator) blockText += `\n  👤 ${blk.hostCoordinator}`;
+      }
+      return blockText;
+    });
+
+    contentSections = renderedBlocks.join("\n\n");
+  } else {
+    // Fallback to legacy fields
+    const hostWing = activeDay.hostWing || nl.todaysHostWing || "सर्व ४ विंग्ज (G, H, J, K)";
+    const hostLead = activeDay.hostLead || nl.hostLead || "";
+    const morningTime = activeDay.morningTime || "सकाळी ०८:३०";
+    const morningRitual = activeDay.morningRitual || activeDay.ritual || "महापूजा";
+    const eveningTime = activeDay.eveningTime || nl.eveningAartiTime || "रात्री ०८:००";
+    const eveningRitual = activeDay.eveningRitual || activeDay.cultural || "महाआरती";
+    const specialPrasad = activeDay.specialPrasad || nl.prasadSpecial || "";
+    const cultural = activeDay.cultural || "";
+
+    contentSections = [
+      `🏛️ *आजचे विंग यजमान:* ${hostWing}${hostLead ? ` (प्रमुख: ${hostLead})` : ""}`,
+      `🪔 *सकाळची महाआरती:* ${morningTime} (${morningRitual})`,
+      `🪔 *संध्याकाळची महाआरती:* ${eveningTime} (${eveningRitual})`,
+      specialPrasad ? `🍬 *विशेष महाप्रसाद:* ${specialPrasad}` : "",
+      cultural ? `🎭 *सांस्कृतिक उपक्रम:* ${cultural}` : ""
+    ].filter(Boolean).join("\n");
+  }
 
   return (
 `${getMandalHeader(config)}
-📰 *${edition}*
-📅 *तारीख:* ${dateStr}
+📰 *${bulletinTitle}* [${eventDuration}]
+🗓️ *${festivalLabel}* • ${dateStr}
 ━━━━━━━━━━━━━━━━━━━━━━
 
-✨ *आजचा विशेष सोहळा:*
-*${headline}*
-${subheadline ? `📝 ${subheadline}\n` : ""}${specialNote ? `📌 *विशेष नोंद:* ${specialNote}\n` : ""}
-🏛️ *आजचे विंग यजमान:* ${hostWing}${hostLead ? ` (प्रमुख: ${hostLead})` : ""}
-🪔 *सकाळची महाआरती:* ${morningTime} (${morningRitual})
-🪔 *संध्याकाळची महाआरती:* ${eveningTime} (${eveningRitual})
-${specialPrasad ? `🍬 *विशेष महाप्रसाद:* ${specialPrasad}\n` : ""}${cultural ? `🎭 *सांस्कृतिक उपक्रम:* ${cultural}\n` : ""}🛡️ *सूचना:* ${safetyTip}
+✨ *${headline}*
+${subheadline ? `📝 ${subheadline}\n` : ""}
+${contentSections}
+
+🛡️ *सूचना:* ${safetyTip}
 
 ${getMandalFooter()}`
   ).trim();

@@ -1,32 +1,102 @@
-﻿import express from "express";
+import express from "express";
+import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import { generateToken, protectAdmin } from "../middleware/authMiddleware.js";
+import { isDatabaseConnected } from "../config/db.js";
+import localStore from "../config/localStore.js";
 
 const router = express.Router();
+
+const OFFICIAL_ADMIN_EMAIL = "mhadatowersutsavmandal@gmail.com";
+const OFFICIAL_ADMIN_PASS = "MhadaGanpati@2025";
 
 // Admin Login with Society Email & Password
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: "कृपया ईमेल व पासवर्ड प्रविष्ट करा (Please provide email and password)" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "कृपया ईमेल व पासवर्ड प्रविष्ट करा (Please provide email and password)" 
+      });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
-    if (user && (await user.matchPassword(password))) {
+    const cleanEmail = (email || "").toLowerCase().trim();
+    const cleanPassword = (password || "").trim();
+
+    const isOfficialEmail = [
+      OFFICIAL_ADMIN_EMAIL,
+      "mhadatowersutsavmandal",
+      "mhadatowersutsav@gmail.com",
+      "admin",
+      "admin_society_mhada"
+    ].includes(cleanEmail);
+
+    const isOfficialPassword = 
+      cleanPassword === OFFICIAL_ADMIN_PASS || 
+      cleanPassword.toLowerCase() === OFFICIAL_ADMIN_PASS.toLowerCase();
+
+    // 1. Direct official committee admin credential check (Always instant & foolproof)
+    if (isOfficialEmail && isOfficialPassword) {
+      const token = generateToken("admin_society_mhada", { email: OFFICIAL_ADMIN_EMAIL, role: "admin" });
       return res.json({
         success: true,
-        token: generateToken(user._id),
+        token,
         user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role
+          id: "admin_society_mhada",
+          name: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
+          email: OFFICIAL_ADMIN_EMAIL,
+          role: "admin"
         }
       });
     }
 
-    return res.status(401).json({ success: false, message: "चुकीचा ईमेल किंवा पासवर्ड (Invalid email or password)" });
+    // 2. Check MongoDB if connected
+    if (isDatabaseConnected()) {
+      try {
+        const user = await User.findOne({ email: cleanEmail });
+        if (user && (await user.matchPassword(password))) {
+          return res.json({
+            success: true,
+            token: generateToken(user._id),
+            user: {
+              id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role
+            }
+          });
+        }
+      } catch (dbError) {
+        console.warn("[Auth] Mongo lookup failed, checking local store:", dbError.message);
+      }
+    }
+
+    // 3. Check local JSON store
+    const localUser = localStore.getUserByEmail(cleanEmail);
+    if (localUser) {
+      const matches = localUser.passwordHash 
+        ? bcrypt.compareSync(password, localUser.passwordHash)
+        : (localUser.password === password);
+      
+      if (matches) {
+        return res.json({
+          success: true,
+          token: generateToken(localUser._id),
+          user: {
+            id: localUser._id,
+            name: localUser.name,
+            email: localUser.email,
+            role: localUser.role
+          }
+        });
+      }
+    }
+
+    return res.status(401).json({ 
+      success: false, 
+      message: "चुकीचा ईमेल किंवा पासवर्ड (Invalid email or password)" 
+    });
   } catch (error) {
     console.error("[Auth] Login error:", error.message);
     res.status(500).json({ success: false, message: "Server error during login" });
@@ -41,28 +111,57 @@ router.post("/google", async (req, res) => {
       return res.status(400).json({ success: false, message: "Email required from Google sign in" });
     }
 
-    // Check if society admin email matches or authorized user exists
-    let user = await User.findOne({ email: email.toLowerCase().trim() });
-    if (!user) {
-      // Allow society authorized gmail or create admin if matches society domain / admin list
-      user = new User({
-        email: email.toLowerCase().trim(),
+    const cleanEmail = email.toLowerCase().trim();
+
+    // 1. If MongoDB is connected, save or find
+    if (isDatabaseConnected()) {
+      try {
+        let user = await User.findOne({ email: cleanEmail });
+        if (!user) {
+          user = new User({
+            email: cleanEmail,
+            name: name || "Society Google Admin",
+            password: Math.random().toString(36).slice(-10),
+            role: "admin",
+            googleId: googleId || "google-auth"
+          });
+          await user.save();
+        }
+        return res.json({
+          success: true,
+          token: generateToken(user._id),
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          }
+        });
+      } catch (dbErr) {
+        console.warn("[Auth] Google sign in Mongo error, falling back to local:", dbErr.message);
+      }
+    }
+
+    // 2. Local fallback for Google login
+    let localUser = localStore.getUserByEmail(cleanEmail);
+    if (!localUser) {
+      localUser = localStore.createUser({
+        email: cleanEmail,
         name: name || "Society Google Admin",
-        password: Math.random().toString(36).slice(-10),
+        passwordHash: bcrypt.hashSync(Math.random().toString(36).slice(-10), 10),
         role: "admin",
         googleId: googleId || "google-auth"
       });
-      await user.save();
     }
 
     return res.json({
       success: true,
-      token: generateToken(user._id),
+      token: generateToken(localUser._id),
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
+        id: localUser._id,
+        name: localUser.name,
+        email: localUser.email,
+        role: localUser.role
       }
     });
   } catch (error) {
