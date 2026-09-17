@@ -8,6 +8,7 @@ import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLoginModal from "./components/AdminLoginModal";
+import AdminResetPasswordModal from "./components/AdminResetPasswordModal";
 import Sidebar from "./components/Sidebar";
 import UpcomingEventsCalendarModal from "./components/UpcomingEventsCalendarModal";
 import { 
@@ -37,7 +38,26 @@ const MainApp = () => {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
       const hasToken = Boolean(localStorage.getItem("mhada_admin_token"));
-      return (path === "/admin" || path === "/admin/" || hash === "#admin") && !hasToken;
+      const isReset = path.includes("reset-password") || window.location.search.includes("token=");
+      return (path === "/admin" || path === "/admin/" || hash === "#admin") && !hasToken && !isReset;
+    }
+    return false;
+  });
+
+  // Password reset modal state
+  const [resetToken, setResetToken] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("token") || "";
+    }
+    return "";
+  });
+
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      return path.includes("reset-password") || Boolean(params.get("token"));
     }
     return false;
   });
@@ -248,6 +268,27 @@ const MainApp = () => {
         onSuccess={() => {
           setIsAdminLoginModalOpen(false);
           handleOpenAdminDashboard();
+        }}
+      />
+
+      {/* Admin Reset Password Modal */}
+      <AdminResetPasswordModal
+        isOpen={isResetPasswordOpen}
+        token={resetToken}
+        onClose={() => {
+          setIsResetPasswordOpen(false);
+          setResetToken("");
+          if (window.location.search.includes("token")) {
+            window.history.pushState({}, "", "/");
+          }
+        }}
+        onSuccess={() => {
+          setIsResetPasswordOpen(false);
+          setResetToken("");
+          if (window.location.search.includes("token")) {
+            window.history.pushState({}, "", "/");
+          }
+          setIsAdminLoginModalOpen(true);
         }}
       />
 

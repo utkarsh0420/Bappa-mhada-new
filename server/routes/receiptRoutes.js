@@ -466,10 +466,9 @@ router.post("/archive/unlock", async (req, res) => {
     }
 
     const cleanPass = password.trim();
-    const OFFICIAL_ADMIN_PASS = "mhada@hig";
     const envPass = process.env.RECEIPT_ARCHIVE_PASSWORD || process.env.ADMIN_PASSWORD;
 
-    let isValid = cleanPass === OFFICIAL_ADMIN_PASS || (envPass && cleanPass === envPass.trim());
+    let isValid = Boolean(envPass && cleanPass === envPass.trim());
 
     if (!isValid && isDatabaseConnected()) {
       const user = await User.findById(req.user?._id || req.user?.id);

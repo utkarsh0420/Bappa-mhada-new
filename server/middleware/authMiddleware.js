@@ -14,60 +14,93 @@ export const protectAdmin = async (req, res, next) => {
   ) {
     try {
       token = req.headers.authorization.split(" ")[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
+      if (!token || token.trim() === "" || token === "null" || token === "undefined") {
+        return res.status(401).json({ success: false, message: "Not authorized, invalid token" });
+      }
 
-      // 1. If MongoDB is connected, try loading from Mongo
+      const decoded = jwt.verify(token, JWT_SECRET);
+      let user = null;
+
+      // 1. If MongoDB is connected, load from MongoDB
       if (isDatabaseConnected()) {
         try {
-          const user = await User.findById(decoded.id).select("-password");
-          if (user) {
-            req.user = user;
-            return next();
-          }
+          user = await User.findById(decoded.id).select("-passwordHash -password -resetTokenHash");
         } catch (dbErr) {
           console.warn("[Auth] Mongo lookup failed, checking local store:", dbErr.message);
         }
       }
 
-      // 2. Check local store
-      const localUser = localStore.getUserById(decoded.id);
-      if (localUser) {
-        req.user = {
-          _id: localUser._id,
-          id: localUser._id,
-          name: localUser.name,
-          email: localUser.email,
-          role: localUser.role
-        };
-        return next();
+      // 2. Fallback to local store
+      if (!user) {
+        const localUser = localStore.getUserById(decoded.id) || localStore.getUserByEmail(decoded.email);
+        if (localUser) {
+          user = {
+            _id: localUser._id,
+            id: localUser._id,
+            name: localUser.name,
+            email: localUser.email,
+            role: localUser.role,
+            isActive: localUser.isActive !== false,
+            lockUntil: localUser.lockUntil,
+            passwordChangedAt: localUser.passwordChangedAt
+          };
+        }
       }
 
-      // 3. Fallback for society admin token
-      if (decoded.id === "admin_society_mhada" || decoded.email === "mhadatowersutsavmandal@gmail.com") {
-        req.user = {
-          _id: "admin_society_mhada",
-          id: "admin_society_mhada",
-          name: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
-          email: "mhadatowersutsavmandal@gmail.com",
-          role: "admin"
-        };
-        return next();
+      // Check if user exists
+      if (!user) {
+        return res.status(401).json({ success: false, message: "Not authorized, user account not found" });
       }
 
-      return res.status(401).json({ success: false, message: "User not found" });
+      // Check if account is active
+      if (user.isActive === false) {
+        return res.status(401).json({ success: false, message: "Account is inactive. Please contact system administrator." });
+      }
+
+      // Check if role is admin
+      if (user.role !== "admin" && user.role !== "superadmin") {
+        return res.status(403).json({ success: false, message: "Access forbidden. Admin role required." });
+      }
+
+      // Check if account is locked
+      if (user.lockUntil && new Date(user.lockUntil).getTime() > Date.now()) {
+        return res.status(423).json({ 
+          success: false, 
+          message: "Account temporarily locked due to repeated failed login attempts. Please try again later." 
+        });
+      }
+
+      // Invalidate token if password was changed after this token was issued
+      if (user.passwordChangedAt && decoded.iat) {
+        const changedTimestamp = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000);
+        if (decoded.iat < changedTimestamp) {
+          return res.status(401).json({ 
+            success: false, 
+            message: "Password was recently changed. Please log in again with your new password." 
+          });
+        }
+      }
+
+      req.user = {
+        _id: user._id,
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      };
+
+      return next();
     } catch (error) {
       console.error("[Auth] Token verification failed:", error.message);
-      return res.status(401).json({ success: false, message: "Not authorized, token invalid or expired" });
+      return res.status(401).json({ success: false, message: "Not authorized, session expired or invalid" });
     }
   }
 
-  if (!token) {
-    return res.status(401).json({ success: false, message: "Not authorized, no token provided" });
-  }
+  return res.status(401).json({ success: false, message: "Not authorized, no session token provided" });
 };
 
 export const generateToken = (id, extra = {}) => {
   return jwt.sign({ id, ...extra }, JWT_SECRET, {
-    expiresIn: "30d"
+    expiresIn: "24h" // Secure 24-hour expiration for admin sessions
   });
 };

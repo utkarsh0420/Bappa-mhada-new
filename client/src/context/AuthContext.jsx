@@ -3,19 +3,6 @@ import API from "../services/api";
 
 const AuthContext = createContext();
 
-const OFFICIAL_ADMIN_EMAILS = [
-  "mhadatowersutsavmandal@gmail.com"
-];
-const OFFICIAL_ADMIN_PASS = "mhada@hig";
-
-const DEFAULT_ADMIN_USER = {
-  id: "admin_society_mhada",
-  _id: "admin_society_mhada",
-  name: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
-  email: "mhadatowersutsavmandal@gmail.com",
-  role: "admin"
-};
-
 export const AuthProvider = ({ children }) => {
   const [admin, setAdmin] = useState(() => {
     try {
@@ -28,127 +15,149 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("mhada_admin_token") || null);
   const [loading, setLoading] = useState(true);
 
-  // Check current session
+  // Validate session on token change or initial mount
   useEffect(() => {
+    let isMounted = true;
     const checkAuth = async () => {
       if (token) {
         try {
           const res = await API.get("/auth/me");
           if (res.data?.success && res.data.user) {
-            setAdmin(res.data.user);
-            localStorage.setItem("mhada_admin_user", JSON.stringify(res.data.user));
-          } else {
-            if (res.data && !res.data.success) {
-              logout();
+            if (isMounted) {
+              setAdmin(res.data.user);
+              localStorage.setItem("mhada_admin_user", JSON.stringify(res.data.user));
             }
+          } else {
+            if (isMounted) logout();
           }
         } catch (err) {
-          // If server is active and returned 401/403, token is actually invalid
-          if (err.response?.status === 401 || err.response?.status === 403) {
-            console.warn("Auth session expired, logging out:", err.message);
-            logout();
+          // If token is invalid, expired, or rejected with 401/403/423
+          if (err.response?.status === 401 || err.response?.status === 403 || err.response?.status === 423) {
+            console.warn("[Auth] Session expired or invalid, logging out:", err.response?.data?.message || err.message);
+            if (isMounted) logout();
           } else {
-            // Server offline or network error - retain existing local admin session!
-            console.warn("Server offline or unreachable, retaining local admin credentials:", err.message);
-            const saved = localStorage.getItem("mhada_admin_user");
-            if (saved) {
-              try {
-                setAdmin(JSON.parse(saved));
-              } catch {
-                setAdmin(DEFAULT_ADMIN_USER);
-              }
-            } else if (token) {
-              setAdmin(DEFAULT_ADMIN_USER);
-            }
+            // Transient network failure: keep current session state without setting hardcoded passwords
+            console.warn("[Auth] Backend unreachable, keeping existing session state:", err.message);
           }
         }
+      } else {
+        if (isMounted) {
+          setAdmin(null);
+        }
       }
-      setLoading(false);
+      if (isMounted) setLoading(false);
     };
 
     checkAuth();
+    return () => { isMounted = false; };
   }, [token]);
 
-  const login = async (email, password) => {
-    const cleanEmail = (email || "").toLowerCase().trim();
+  /**
+   * Server-side login verifying MongoDB bcrypt hash
+   */
+  const login = async (emailOrUsername, password) => {
+    const cleanIdentifier = (emailOrUsername || "").toLowerCase().trim();
     const cleanPassword = (password || "").trim();
 
-    const isMatchOfficial = 
-      OFFICIAL_ADMIN_EMAILS.includes(cleanEmail) &&
-      cleanPassword === OFFICIAL_ADMIN_PASS;
+    if (!cleanIdentifier || !cleanPassword) {
+      return {
+        success: false,
+        message: "कृपया ईमेल व पासवर्ड प्रविष्ट करा (Please provide email and password)"
+      };
+    }
 
     try {
-      const res = await API.post("/auth/login", { email: cleanEmail, password: cleanPassword });
-      if (res.data?.success) {
+      const res = await API.post("/auth/login", { 
+        email: cleanIdentifier, 
+        password: cleanPassword 
+      });
+
+      if (res.data?.success && res.data.token) {
         localStorage.setItem("mhada_admin_token", res.data.token);
         localStorage.setItem("mhada_admin_user", JSON.stringify(res.data.user));
         setToken(res.data.token);
         setAdmin(res.data.user);
         return { success: true };
       }
-      return { success: false, message: res.data?.message || "लॉगिन अयशस्वी झाले" };
-    } catch (err) {
-      // 1. If server explicitly rejected password with 400 or 401
-      if (err.response?.status === 400 || err.response?.status === 401) {
-        return {
-          success: false,
-          message: err.response?.data?.message || "चुकीचा ईमेल किंवा पासवर्ड (Invalid email or password)"
-        };
-      }
 
-      // 2. If server is offline / unreachable (Network error / Vite 504 / 500)
-      if (isMatchOfficial) {
-        const localToken = "offline_admin_token_" + Date.now();
-        localStorage.setItem("mhada_admin_token", localToken);
-        localStorage.setItem("mhada_admin_user", JSON.stringify(DEFAULT_ADMIN_USER));
-        setToken(localToken);
-        setAdmin(DEFAULT_ADMIN_USER);
-        return { success: true, offline: true };
-      }
-
-      return {
-        success: false,
-        message: err.response?.data?.message || "सर्व्हरशी संपर्क होऊ शकला नाही. कृपया बॅकएंड सुरू करा किंवा अधिकृत पासवर्ड वापरा."
+      return { 
+        success: false, 
+        message: res.data?.message || "लॉगिन अयशस्वी झाले (Login failed)" 
       };
+    } catch (err) {
+      const msg = err.response?.data?.message || "लॉगिन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा. (Login failed. Please try again.)";
+      return { success: false, message: msg };
     }
   };
 
-  const googleLogin = async (googleProfile) => {
+  /**
+   * Request password reset link (anti-enumeration)
+   */
+  const forgotPassword = async (email) => {
+    const cleanEmail = (email || "").toLowerCase().trim();
+    if (!cleanEmail) {
+      return {
+        success: false,
+        message: "कृपया नोंदणीकृत ईमेल प्रविष्ट करा (Please enter registered email)"
+      };
+    }
+
     try {
-      const res = await API.post("/auth/google", googleProfile);
-      if (res.data?.success) {
-        localStorage.setItem("mhada_admin_token", res.data.token);
-        localStorage.setItem("mhada_admin_user", JSON.stringify(res.data.user));
-        setToken(res.data.token);
-        setAdmin(res.data.user);
-        return { success: true };
-      }
-      return { success: false, message: res.data?.message };
-    } catch (err) {
-      // Fallback Google Login if backend server is unreachable
-      if (!err.response || err.response?.status >= 500 || err.code === "ERR_NETWORK") {
-        const localGoogleUser = {
-          id: "admin_society_mhada_google",
-          _id: "admin_society_mhada_google",
-          name: googleProfile?.name || "म्हाडा उत्सव मंडळ कमिटी (Google Society Account)",
-          email: googleProfile?.email || "mhadatowersutsavmandal@gmail.com",
-          role: "admin"
-        };
-        const localToken = "offline_google_token_" + Date.now();
-        localStorage.setItem("mhada_admin_token", localToken);
-        localStorage.setItem("mhada_admin_user", JSON.stringify(localGoogleUser));
-        setToken(localToken);
-        setAdmin(localGoogleUser);
-        return { success: true, offline: true };
-      }
+      const res = await API.post("/auth/forgot-password", { email: cleanEmail });
       return {
-        success: false,
-        message: err.response?.data?.message || "Google लॉगिन अयशस्वी (Google login failed)"
+        success: true,
+        message: res.data?.message || "पासवर्ड रीसेट लिंक ईमेलवर पाठवली आहे."
       };
+    } catch (err) {
+      const msg = err.response?.data?.message || "विनंती पाठवण्यात त्रुटी आली. कृपया पुन्हा प्रयत्न करा.";
+      return { success: false, message: msg };
     }
   };
 
+  /**
+   * Submit new password using secure single-use reset token
+   */
+  const resetPassword = async (tokenString, newPassword) => {
+    const cleanToken = (tokenString || "").trim();
+    const cleanNewPass = (newPassword || "").trim();
+
+    if (!cleanToken || !cleanNewPass) {
+      return {
+        success: false,
+        message: "टोकन आणि नवीन पासवर्ड आवश्यक आहे."
+      };
+    }
+
+    if (cleanNewPass.length < 8) {
+      return {
+        success: false,
+        message: "पासवर्ड किमान ८ वर्णांचा असणे आवश्यक आहे (Minimum 8 characters)."
+      };
+    }
+
+    try {
+      const res = await API.post("/auth/reset-password", {
+        token: cleanToken,
+        newPassword: cleanNewPass
+      });
+
+      return {
+        success: true,
+        message: res.data?.message || "पासवर्ड यशस्वीरित्या बदलला आहे."
+      };
+    } catch (err) {
+      const msg = err.response?.data?.message || "पासवर्ड रीसेट अयशस्वी. लिंक अवैध किंवा कालबाह्य झाली असावी.";
+      return { success: false, message: msg };
+    }
+  };
+
+  /**
+   * Secure Logout
+   */
   const logout = () => {
+    try {
+      API.post("/auth/logout").catch(() => {});
+    } catch {}
     localStorage.removeItem("mhada_admin_token");
     localStorage.removeItem("mhada_admin_user");
     setToken(null);
@@ -156,7 +165,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ admin, token, loading, login, googleLogin, logout }}>
+    <AuthContext.Provider value={{ 
+      admin, 
+      token, 
+      loading, 
+      login, 
+      forgotPassword, 
+      resetPassword, 
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   );

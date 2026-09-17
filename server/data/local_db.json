@@ -2,11 +2,19 @@
   "users": [
     {
       "_id": "admin_society_mhada",
+      "username": "admin",
       "email": "mhadatowersutsavmandal@gmail.com",
-      "passwordHash": "$2a$10$xH/e1Hr4auxGA2RokuYIsevQMoxvGXBS2G2JArgDYTu8.oDKO0iKC",
+      "passwordHash": "$2a$10$28kihiLQHSb5C.ILlPSOY.crVaBsg06xpSLNcnnNSg8t9mnLnoJ8m",
       "name": "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
       "role": "admin",
-      "createdAt": "2026-09-14T14:31:23.330Z"
+      "isActive": true,
+      "failedLoginAttempts": 0,
+      "lockUntil": null,
+      "resetTokenHash": null,
+      "resetTokenExpiresAt": null,
+      "passwordChangedAt": "2026-09-17T13:07:23.706Z",
+      "createdAt": "2026-09-14T14:31:23.330Z",
+      "updatedAt": "2026-09-17T13:24:33.161Z"
     }
   ],
   "config": {

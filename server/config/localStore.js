@@ -27,10 +27,17 @@ const defaultInitialData = {
   users: [
     {
       _id: "admin_society_mhada",
-      email: "mhadatowersutsavmandal@gmail.com",
-      passwordHash: bcrypt.hashSync("mhada@hig", 10),
-      name: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
+      username: process.env.ADMIN_INITIAL_USERNAME || "admin",
+      email: (process.env.ADMIN_INITIAL_EMAIL || "mhadatowersutsavmandal@gmail.com").toLowerCase().trim(),
+      passwordHash: bcrypt.hashSync(process.env.ADMIN_INITIAL_PASSWORD || "mhada@hig", 10),
+      name: process.env.ADMIN_INITIAL_NAME || "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
       role: "admin",
+      isActive: true,
+      failedLoginAttempts: 0,
+      lockUntil: null,
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+      passwordChangedAt: null,
       createdAt: new Date().toISOString()
     }
   ],
@@ -411,16 +418,23 @@ class LocalStore {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, "utf-8");
         this.data = JSON.parse(raw);
-        // Ensure only one admin user exists with password mhada@hig
-        const adminUser = this.getUserByEmail("mhadatowersutsavmandal@gmail.com");
-        if (!adminUser) {
+        // Verify or initialize admin user without overwriting existing password
+        if (!Array.isArray(this.data.users) || this.data.users.length === 0) {
           this.data.users = [defaultInitialData.users[0]];
           this.save();
         } else {
-          adminUser.passwordHash = bcrypt.hashSync("mhada@hig", 10);
-          delete adminUser.password;
-          this.data.users = [adminUser];
-          this.save();
+          const adminUser = this.data.users.find(u => u.role === "admin") || this.data.users[0];
+          if (adminUser) {
+            if (adminUser.isActive === undefined) adminUser.isActive = true;
+            if (adminUser.failedLoginAttempts === undefined) adminUser.failedLoginAttempts = 0;
+            if (adminUser.lockUntil === undefined) adminUser.lockUntil = null;
+            if (adminUser.resetTokenHash === undefined) adminUser.resetTokenHash = null;
+            if (adminUser.resetTokenExpiresAt === undefined) adminUser.resetTokenExpiresAt = null;
+            if (adminUser.passwordChangedAt === undefined) adminUser.passwordChangedAt = null;
+            if (!adminUser.username) adminUser.username = "admin";
+            delete adminUser.password;
+            this.save();
+          }
         }
         if (!this.data.config.festivalScheduleCard) {
           this.data.config.festivalScheduleCard = defaultInitialData.config.festivalScheduleCard;
@@ -757,15 +771,36 @@ class LocalStore {
   }
 
   // Users
-  getUserByEmail(email) {
-    if (!email || !this.data?.users) return null;
-    const normalized = email.toLowerCase().trim();
-    return this.data.users.find(u => u.email.toLowerCase().trim() === normalized) || null;
+  getUserByEmail(emailOrUsername) {
+    if (!emailOrUsername || !this.data?.users) return null;
+    const normalized = emailOrUsername.toLowerCase().trim();
+    return this.data.users.find(u => 
+      (u.email && u.email.toLowerCase().trim() === normalized) ||
+      (u.username && u.username.toLowerCase().trim() === normalized)
+    ) || null;
   }
 
   getUserById(id) {
     if (!id || !this.data?.users) return null;
     return this.data.users.find(u => String(u._id) === String(id)) || null;
+  }
+
+  getUserByResetTokenHash(tokenHash) {
+    if (!tokenHash || !this.data?.users) return null;
+    return this.data.users.find(u => u.resetTokenHash === tokenHash) || null;
+  }
+
+  updateUser(id, updates) {
+    if (!id || !this.data?.users) return null;
+    const idx = this.data.users.findIndex(u => String(u._id) === String(id));
+    if (idx === -1) return null;
+    this.data.users[idx] = {
+      ...this.data.users[idx],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    this.save();
+    return this.data.users[idx];
   }
 
   createUser(userData) {

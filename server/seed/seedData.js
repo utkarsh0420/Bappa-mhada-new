@@ -4,26 +4,51 @@ import FestivalEvent from "../models/FestivalEvent.js";
 import Contact from "../models/Contact.js";
 import User from "../models/User.js";
 
+import bcrypt from "bcryptjs";
+
 export const seedInitialData = async () => {
   try {
-    // 1. Seed Single Admin User
-    let existingAdmin = await User.findOne({ email: "mhadatowersutsavmandal@gmail.com" });
+    // 1. Check if Admin User exists
+    const initialEmail = (process.env.ADMIN_INITIAL_EMAIL || "mhadatowersutsavmandal@gmail.com").toLowerCase().trim();
+    const initialPass = process.env.ADMIN_INITIAL_PASSWORD || "mhada@hig";
+    const initialName = process.env.ADMIN_INITIAL_NAME || "म्हाडा उत्सव समिती अध्यक्ष (Admin)";
+    const initialUsername = process.env.ADMIN_INITIAL_USERNAME || "admin";
+
+    let existingAdmin = await User.findOne({ role: "admin" });
     if (!existingAdmin) {
+      const passwordHash = await bcrypt.hash(initialPass, 10);
       const admin = new User({
-        email: "mhadatowersutsavmandal@gmail.com",
-        password: "mhada@hig",
-        name: "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
-        role: "admin"
+        username: initialUsername,
+        email: initialEmail,
+        passwordHash,
+        name: initialName,
+        role: "admin",
+        isActive: true,
+        failedLoginAttempts: 0,
+        lockUntil: null,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+        passwordChangedAt: null
       });
       await admin.save();
-      console.log("[Seed] Admin user seeded: mhadatowersutsavmandal@gmail.com / mhada@hig");
+      console.log("[Seed] Initial admin user account created successfully.");
     } else {
-      existingAdmin.password = "mhada@hig";
-      await existingAdmin.save();
-      console.log("[Seed] Admin user password updated to mhada@hig");
+      // Ensure essential fields exist without overwriting password
+      let needsSave = false;
+      if (existingAdmin.isActive === undefined) {
+        existingAdmin.isActive = true;
+        needsSave = true;
+      }
+      if (!existingAdmin.passwordHash && existingAdmin.password) {
+        existingAdmin.passwordHash = await bcrypt.hash(existingAdmin.password, 10);
+        existingAdmin.password = undefined;
+        needsSave = true;
+      }
+      if (needsSave) {
+        await existingAdmin.save();
+      }
+      console.log("[Seed] Existing admin user verified.");
     }
-    // Clean up any other user records to ensure only one admin user exists
-    await User.deleteMany({ email: { $ne: "mhadatowersutsavmandal@gmail.com" } });
 
     // Official 12 Committee Members
     const officialCommitteeMembers = [
