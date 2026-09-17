@@ -128,9 +128,15 @@ const defaultInitialData = {
       titleMr: "दैनिक महाआरती व विंग यजमान",
       titleEn: "Daily Maha Aarti & Host Wings",
       subtitleMr: "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती",
-      subtitleEn: "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal",
+      subtitleEn: "Every day at 08:30 AM and 07:30 PM near G wing",
       countdownLabelMr: "पुढील महाआरतीसाठी शिल्लक वेळ",
-      countdownLabelEn: "Time Remaining Until Next Aarti"
+      countdownLabelEn: "Time Remaining Until Next Aarti",
+      startDate: "2026-09-07",
+      endDate: "2026-09-16",
+      morningTime: "सकाळी ०८:३० वाजता",
+      morningTimeEn: "08:30 AM",
+      eveningTime: "रात्री ०७:३० वाजता",
+      eveningTimeEn: "07:30 PM"
     },
     dailyAartiSchedule: [
       {
@@ -443,6 +449,7 @@ class LocalStore {
         this.migrateGalleryIfNeeded();
         this.migrateScrollerIfNeeded();
         this.migrateNewsletterIfNeeded();
+        this.migrateAartiSectionIfNeeded();
       } else {
         this.data = JSON.parse(JSON.stringify(defaultInitialData));
         this.save();
@@ -696,6 +703,45 @@ class LocalStore {
       this.data.config.gallery = festivals;
       this.save();
       console.log(`[LocalStore] Gallery migration completed. Total festivals: ${festivals.length}`);
+    }
+  }
+
+  migrateAartiSectionIfNeeded() {
+    if (!this.data?.config) return;
+    if (!this.data.config.dailyAartiSection) {
+      this.data.config.dailyAartiSection = JSON.parse(JSON.stringify(defaultInitialData.config.dailyAartiSection));
+      this.save();
+      return;
+    }
+    const sec = this.data.config.dailyAartiSection;
+    let modified = false;
+    if (!sec.startDate) {
+      sec.startDate = "2026-09-07";
+      modified = true;
+    }
+    if (!sec.endDate) {
+      sec.endDate = "2026-09-16";
+      modified = true;
+    }
+    if (!sec.morningTime) {
+      sec.morningTime = "सकाळी ०८:३० वाजता";
+      modified = true;
+    }
+    if (!sec.morningTimeEn) {
+      sec.morningTimeEn = "08:30 AM";
+      modified = true;
+    }
+    if (!sec.eveningTime) {
+      sec.eveningTime = "रात्री ०७:३० वाजता";
+      modified = true;
+    }
+    if (!sec.eveningTimeEn) {
+      sec.eveningTimeEn = "07:30 PM";
+      modified = true;
+    }
+    if (modified) {
+      this.save();
+      console.log("[LocalStore] Daily Aarti section active period fields initialized.");
     }
   }
 

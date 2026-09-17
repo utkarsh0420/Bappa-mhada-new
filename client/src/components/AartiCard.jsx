@@ -4,6 +4,10 @@ import {
 } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
+import { 
+  calculateFestivalDay, 
+  calculateAartiCountdown 
+} from "../utils/aartiDateUtils";
 
 // Helper to parse any 12h/24h/Marathi time string into 24-hour HH:mm
 const parseTimeTo24h = (str) => {
@@ -98,28 +102,52 @@ const AartiCard = () => {
     config?.dailyAartiSection?.enabled !== false;
 
   const rawSchedule = config?.dailyAartiSchedule || [];
+  const sectionConfig = config?.dailyAartiSection || {};
+  const startDate = sectionConfig.startDate || "2026-09-07";
+  const endDate = sectionConfig.endDate || "2026-09-16";
+
+  // Calculate festival day dynamically from active period (Asia/Kolkata)
+  const dayInfo = useMemo(() => {
+    return calculateFestivalDay(startDate, endDate);
+  }, [startDate, endDate]);
 
   const [activeDayIndex, setActiveDayIndex] = useState(() => {
-    const initIdx = (config?.dailyAartiSchedule || []).findIndex((item) => item.isCurrentDay);
-    return initIdx !== -1 ? initIdx : 0;
+    const initDayInfo = calculateFestivalDay(startDate, endDate);
+    if (initDayInfo.status === "active" && initDayInfo.currentDay && rawSchedule.length > 0) {
+      const foundIdx = rawSchedule.findIndex((item) => item.dayNumber === initDayInfo.currentDay);
+      if (foundIdx !== -1) return foundIdx;
+      if (initDayInfo.currentDay - 1 >= 0 && initDayInfo.currentDay - 1 < rawSchedule.length) {
+        return initDayInfo.currentDay - 1;
+      }
+    }
+    const currentIdx = (config?.dailyAartiSchedule || []).findIndex((item) => item.isCurrentDay);
+    return currentIdx !== -1 ? currentIdx : 0;
   });
 
-  // Sync active day whenever isCurrentDay or schedule changes in admin config
+  // Automatically select today's day if within active festival period
   useEffect(() => {
     if (rawSchedule && rawSchedule.length > 0) {
-      const currentIdx = rawSchedule.findIndex((item) => item.isCurrentDay);
-      if (currentIdx !== -1) {
-        setActiveDayIndex(currentIdx);
-      } else if (activeDayIndex >= rawSchedule.length) {
+      if (dayInfo.status === "active" && dayInfo.currentDay) {
+        const foundIdx = rawSchedule.findIndex((item) => item.dayNumber === dayInfo.currentDay);
+        if (foundIdx !== -1) {
+          setActiveDayIndex(foundIdx);
+          return;
+        }
+        if (dayInfo.currentDay - 1 >= 0 && dayInfo.currentDay - 1 < rawSchedule.length) {
+          setActiveDayIndex(dayInfo.currentDay - 1);
+          return;
+        }
+      }
+      if (activeDayIndex >= rawSchedule.length) {
         setActiveDayIndex(0);
       }
     }
-  }, [rawSchedule]);
+  }, [dayInfo.status, dayInfo.currentDay, rawSchedule]);
 
   // Dynamic Countdown State
   const [countdown, setCountdown] = useState({
     targetName: language === "mr" ? "संध्याकाळची महाआरती" : "Evening Maha Aarti",
-    targetTime: language === "mr" ? "रात्री ०८:०० वाजता" : "08:00 PM",
+    targetTime: language === "mr" ? "रात्री ०७:३० वाजता" : "07:30 PM",
     hours: "00",
     minutes: "00",
     seconds: "00",
@@ -134,125 +162,52 @@ const AartiCard = () => {
     }
 
     const calculateCountdown = () => {
-      const now = new Date();
-      const currentDayIdx = rawSchedule.findIndex((d) => d.isCurrentDay);
-      const baseTodayIdx = currentDayIdx !== -1 ? currentDayIdx : 0;
+      // Look up today's day item if active, or active day item
+      const todayDayItem = 
+        (dayInfo.status === "active" && rawSchedule.find((d) => d.dayNumber === dayInfo.currentDay)) ||
+        rawSchedule[activeDayIndex] || 
+        rawSchedule[0];
 
-      // Build flat list of all events with concrete Date timestamps
-      const eventOccurrences = [];
+      const events = normalizeDayEvents(todayDayItem, activeDayIndex);
+      const mEvt = events.find((e) => e.type === "morning") || events[0];
+      const eEvt = events.find((e) => e.type === "evening") || events[1] || events[0];
 
-      rawSchedule.forEach((dayItem, dayIdx) => {
-        const events = normalizeDayEvents(dayItem, dayIdx);
-        
-        // Resolve calendar date for this day
-        let dayDateObj;
-        if (dayItem.date && /^\d{4}-\d{2}-\d{2}$/.test(dayItem.date)) {
-          const [y, m, d] = dayItem.date.split("-").map(Number);
-          dayDateObj = new Date(y, m - 1, d);
-        } else {
-          // Relative to today based on index difference
-          const dayDiff = dayIdx - baseTodayIdx;
-          dayDateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayDiff);
-        }
+      const mTitleMr = mEvt?.categoryMr || mEvt?.titleMr || "सकाळची महाआरती";
+      const mTitleEn = mEvt?.categoryEn || mEvt?.titleEn || "Morning Maha Aarti";
+      const eTitleMr = eEvt?.categoryMr || eEvt?.titleMr || "संध्याकाळची महाआरती";
+      const eTitleEn = eEvt?.categoryEn || eEvt?.titleEn || "Evening Maha Aarti";
 
-        const year = dayDateObj.getFullYear();
-        const month = dayDateObj.getMonth();
-        const dateNum = dayDateObj.getDate();
-
-        events.forEach((evt) => {
-          const start24 = parseTimeTo24h(evt.startTime || evt.timeEn || evt.time || "08:30");
-          const end24 = parseTimeTo24h(evt.endTime || "09:30");
-
-          const [sH, sM] = start24.split(":").map(Number);
-          const [eH, eM] = end24.split(":").map(Number);
-
-          const startDate = new Date(year, month, dateNum, sH, sM, 0, 0);
-          let endDate = new Date(year, month, dateNum, eH, eM, 0, 0);
-          if (endDate <= startDate) {
-            // If end time is earlier or same as start time, assume next day or 1 hour duration
-            endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-          }
-
-          eventOccurrences.push({
-            event: evt,
-            day: dayItem,
-            startDate,
-            endDate
-          });
-        });
+      const currentCountdown = calculateAartiCountdown({
+        startDate,
+        endDate,
+        morningTime: sectionConfig.morningTimeEn || mEvt?.timeEn || "08:30 AM",
+        eveningTime: sectionConfig.eveningTimeEn || eEvt?.timeEn || "07:30 PM",
+        morningTitleMr: mTitleMr,
+        morningTitleEn: mTitleEn,
+        eveningTitleMr: eTitleMr,
+        eveningTitleEn: eTitleEn,
+        language,
+        nowDate: new Date()
       });
 
-      // Filter upcoming vs ongoing
-      const upcoming = eventOccurrences
-        .filter((occ) => occ.startDate.getTime() > now.getTime())
-        .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-
-      const ongoing = eventOccurrences.find(
-        (occ) => occ.startDate.getTime() <= now.getTime() && occ.endDate.getTime() >= now.getTime()
-      );
-
-      if (upcoming.length > 0) {
-        const nextOcc = upcoming[0];
-        const diffMs = nextOcc.startDate.getTime() - now.getTime();
-
-        const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
-
-        const nextName = language === "mr" 
-          ? (nextOcc.event.categoryMr || nextOcc.event.titleMr || "महाआरती")
-          : (nextOcc.event.categoryEn || nextOcc.event.titleEn || "Maha Aarti");
-
-        const nextTime = language === "mr" 
-          ? (nextOcc.event.time || nextOcc.event.timeEn || "०८:०० PM")
-          : (nextOcc.event.timeEn || nextOcc.event.time || "08:00 PM");
-
-        setCountdown({
-          targetName: nextName,
-          targetTime: nextTime,
-          hours: String(hours).padStart(2, "0"),
-          minutes: String(minutes).padStart(2, "0"),
-          seconds: String(seconds).padStart(2, "0"),
-          isOngoing: false,
-          allCompleted: false
-        });
-      } else if (ongoing) {
-        const ongoingName = language === "mr" 
-          ? `${ongoing.event.categoryMr || ongoing.event.titleMr || "महाआरती"} (सुरू आहे)`
-          : `${ongoing.event.categoryEn || ongoing.event.titleEn || "Maha Aarti"} (Live Now)`;
-
-        const ongoingTime = language === "mr" 
-          ? (ongoing.event.time || ongoing.event.timeEn || "")
-          : (ongoing.event.timeEn || ongoing.event.time || "");
-
-        setCountdown({
-          targetName: ongoingName,
-          targetTime: ongoingTime,
-          hours: "00",
-          minutes: "00",
-          seconds: "00",
-          isOngoing: true,
-          allCompleted: false
-        });
-      } else {
-        // All scheduled events completed gracefully
-        setCountdown({
-          targetName: language === "mr" ? "सर्व आरत्या संपन्न" : "All Aartis Completed",
-          targetTime: language === "mr" ? "दर्शन सुरू आहे" : "Darshan Live",
-          hours: "00",
-          minutes: "00",
-          seconds: "00",
-          isOngoing: false,
-          allCompleted: true
-        });
-      }
+      setCountdown(currentCountdown);
     };
 
     calculateCountdown();
     const interval = setInterval(calculateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [isEnabled, rawSchedule, language]);
+  }, [
+    isEnabled, 
+    rawSchedule, 
+    startDate, 
+    endDate, 
+    sectionConfig.morningTimeEn, 
+    sectionConfig.eveningTimeEn, 
+    language, 
+    dayInfo.status, 
+    dayInfo.currentDay, 
+    activeDayIndex
+  ]);
 
   // If section is disabled or schedule is empty, render nothing
   if (!isEnabled || rawSchedule.length === 0) {
@@ -263,7 +218,6 @@ const AartiCard = () => {
   const activeDayEvents = normalizeDayEvents(activeDay, activeDayIndex);
 
   // Editable Section Header Texts (with default fallbacks)
-  const sectionConfig = config?.dailyAartiSection || {};
   const sectionBadge = language === "mr" 
     ? (sectionConfig.badgeMr || t("aartiTitle")) 
     : (sectionConfig.badgeEn || t("aartiTitle"));
@@ -274,11 +228,21 @@ const AartiCard = () => {
 
   const sectionSubtitle = language === "mr"
     ? (sectionConfig.subtitleMr || "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती")
-    : (sectionConfig.subtitleEn || "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal");
+    : (sectionConfig.subtitleEn || "Every day at 08:30 AM and 07:30 PM near G wing");
 
   const countdownLabel = language === "mr"
     ? (sectionConfig.countdownLabelMr || t("nextAartiCountdown"))
     : (sectionConfig.countdownLabelEn || t("nextAartiCountdown"));
+
+  const countdownHeaderLabel = useMemo(() => {
+    if (dayInfo.status === "upcoming") {
+      return language === "mr" ? "महाआरती आगमन कालावधी" : "Time Remaining Until Festival Aarti";
+    }
+    if (dayInfo.status === "concluded") {
+      return language === "mr" ? "उत्सव संपन्न" : "Festival Completed";
+    }
+    return countdownLabel;
+  }, [dayInfo.status, countdownLabel, language]);
 
   // Dynamic Day selector label
   const dayCount = rawSchedule.length;
@@ -286,9 +250,21 @@ const AartiCard = () => {
     ? `दिवस निवडा (${dayCount} दिवस वेळापत्रक):`
     : `SELECT DAY (${dayCount} ${dayCount === 1 ? "DAY" : "DAYS"}):`;
 
-  const activeDayDisplayDate = language === "mr" 
-    ? (activeDay.dateStr || activeDay.dateStrEn || "") 
-    : (activeDay.dateStrEn || activeDay.dateStr || "");
+  const activeDayDisplayDate = useMemo(() => {
+    if (dayInfo.status === "upcoming") {
+      return language === "mr" 
+        ? `आगामी सोहळा (सुरुवात: ${startDate})`
+        : `Upcoming Event (Starts: ${startDate})`;
+    }
+    if (dayInfo.status === "concluded") {
+      return language === "mr" 
+        ? `उत्सव सांगता (${endDate})`
+        : `Festival Concluded (${endDate})`;
+    }
+    return language === "mr" 
+      ? (activeDay.dateStr || activeDay.dateStrEn || `दिवस ${dayInfo.currentDay || activeDay.dayNumber || activeDayIndex + 1}`) 
+      : (activeDay.dateStrEn || activeDay.dateStr || `Day ${dayInfo.currentDay || activeDay.dayNumber || activeDayIndex + 1}`);
+  }, [dayInfo, activeDay, startDate, endDate, language, activeDayIndex]);
 
   return (
     <section id="aarti" className="scroll-mt-20 my-6">
@@ -321,7 +297,7 @@ const AartiCard = () => {
               <div>
                 <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-gold-300 bg-maroon-800 px-2 py-0.5 rounded-full border border-gold-500/30">
                   <Timer className="w-3 h-3" />
-                  <span>{countdownLabel}</span>
+                  <span>{countdownHeaderLabel}</span>
                 </div>
                 <h3 className="text-sm sm:text-base font-bold text-gold-100 mt-0.5">
                   {countdown.targetName} • <span className="text-gold-300">{countdown.targetTime}</span>
@@ -380,6 +356,8 @@ const AartiCard = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
             {rawSchedule.map((item, idx) => {
               const isSelected = idx === activeDayIndex;
+              const isTodayPill = dayInfo.status === "active" && (item.dayNumber === dayInfo.currentDay || idx === (dayInfo.currentDay - 1));
+
               return (
                 <button
                   key={item.id || item.dayNumber || idx}
@@ -391,7 +369,7 @@ const AartiCard = () => {
                   }`}
                 >
                   <span className="whitespace-nowrap">{t("day")} {item.dayNumber || idx + 1}</span>
-                  {item.isCurrentDay && (
+                  {isTodayPill && (
                     <span className="ml-1 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-bold">
                       {language === "mr" ? "आज" : "Today"}
                     </span>

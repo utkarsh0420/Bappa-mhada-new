@@ -3,7 +3,8 @@ import {
   Flame, Save, Calendar, Clock, Building2, 
   Sparkles, Check, CheckCircle2, Star, Globe, Info, Share2,
   Upload, Image as ImageIcon, Trash2, Eye, X, ChevronDown, ChevronUp,
-  Link as LinkIcon, Users, Plus, ArrowUp, ArrowDown, Power, Edit3, Tag
+  Link as LinkIcon, Users, Plus, ArrowUp, ArrowDown, Power, Edit3, Tag,
+  AlertCircle, Timer
 } from "lucide-react";
 import { 
   FestiveCard, FestiveInput, FestiveTextarea, FestiveButton, 
@@ -12,6 +13,14 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import { formatAartiScheduleBroadcast, formatSingleAartiDay, openWhatsApp } from "../../utils/whatsappFormatter";
 import API from "../../services/api";
+import { 
+  calculateFestivalDay, 
+  calculateAartiCountdown, 
+  diffInDays, 
+  getKolkataDate,
+  format24hTo12h,
+  parseTimeTo24h
+} from "../../utils/aartiDateUtils";
 
 import { 
   getWings, 
@@ -40,10 +49,42 @@ const AartiScheduleManager = ({
     titleMr: "दैनिक महाआरती व विंग यजमान",
     titleEn: "Daily Maha Aarti & Host Wings",
     subtitleMr: "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती",
-    subtitleEn: "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal",
+    subtitleEn: "Every day at 08:30 AM and 07:30 PM near G wing",
     countdownLabelMr: "पुढील महाआरतीसाठी शिल्लक वेळ",
-    countdownLabelEn: "Time Remaining Until Next Aarti"
+    countdownLabelEn: "Time Remaining Until Next Aarti",
+    startDate: "2026-09-07",
+    endDate: "2026-09-16",
+    morningTime: "सकाळी ०८:३० वाजता",
+    morningTimeEn: "08:30 AM",
+    eveningTime: "रात्री ०७:३० वाजता",
+    eveningTimeEn: "07:30 PM"
   });
+
+  // Admin Live Preview State
+  const [livePreview, setLivePreview] = useState(() => 
+    calculateAartiCountdown({
+      startDate: "2026-09-07",
+      endDate: "2026-09-16",
+      morningTime: "08:30 AM",
+      eveningTime: "07:30 PM",
+      language
+    })
+  );
+
+  useEffect(() => {
+    const updatePreview = () => {
+      setLivePreview(calculateAartiCountdown({
+        startDate: sectionHeaders.startDate || "2026-09-07",
+        endDate: sectionHeaders.endDate || "2026-09-16",
+        morningTime: sectionHeaders.morningTimeEn || "08:30 AM",
+        eveningTime: sectionHeaders.eveningTimeEn || "07:30 PM",
+        language
+      }));
+    };
+    updatePreview();
+    const interval = setInterval(updatePreview, 1000);
+    return () => clearInterval(interval);
+  }, [sectionHeaders.startDate, sectionHeaders.endDate, sectionHeaders.morningTimeEn, sectionHeaders.eveningTimeEn, language]);
 
   const normalizeDayForAdmin = (day, idx) => {
     let events = Array.isArray(day.events) && day.events.length > 0 ? day.events : null;
@@ -134,7 +175,13 @@ const AartiScheduleManager = ({
         subtitleMr: config.dailyAartiSection.subtitleMr || prev.subtitleMr,
         subtitleEn: config.dailyAartiSection.subtitleEn || prev.subtitleEn,
         countdownLabelMr: config.dailyAartiSection.countdownLabelMr || prev.countdownLabelMr,
-        countdownLabelEn: config.dailyAartiSection.countdownLabelEn || prev.countdownLabelEn
+        countdownLabelEn: config.dailyAartiSection.countdownLabelEn || prev.countdownLabelEn,
+        startDate: config.dailyAartiSection.startDate || prev.startDate || "2026-09-07",
+        endDate: config.dailyAartiSection.endDate || prev.endDate || "2026-09-16",
+        morningTime: config.dailyAartiSection.morningTime || prev.morningTime || "सकाळी ०८:३० वाजता",
+        morningTimeEn: config.dailyAartiSection.morningTimeEn || prev.morningTimeEn || "08:30 AM",
+        eveningTime: config.dailyAartiSection.eveningTime || prev.eveningTime || "रात्री ०७:३० वाजता",
+        eveningTimeEn: config.dailyAartiSection.eveningTimeEn || prev.eveningTimeEn || "07:30 PM"
       }));
     }
 
@@ -441,6 +488,35 @@ const AartiScheduleManager = ({
 
   const handleSaveAarti = async (e) => {
     if (e) e.preventDefault();
+
+    // 1. Validation for Active Period & Aarti Timings
+    const { startDate, endDate, morningTimeEn, eveningTimeEn } = sectionHeaders;
+    if (!startDate) {
+      onNotify(isEn ? "Start Date is required" : "सुरू होणारा दिनांक आवश्यक आहे", "error");
+      return;
+    }
+    if (!endDate) {
+      onNotify(isEn ? "End Date is required" : "समाप्त होणारा दिनांक आवश्यक आहे", "error");
+      return;
+    }
+    if (endDate < startDate) {
+      onNotify(
+        isEn 
+          ? "End date must be on or after the start date." 
+          : "समाप्ती तारीख ही सुरू होणाऱ्या तारखेच्या नंतरची किंवा तीच असावी.",
+        "error"
+      );
+      return;
+    }
+    if (!morningTimeEn || !morningTimeEn.trim()) {
+      onNotify(isEn ? "Morning Aarti time is required" : "सकाळची आरती वेळ आवश्यक आहे", "error");
+      return;
+    }
+    if (!eveningTimeEn || !eveningTimeEn.trim()) {
+      onNotify(isEn ? "Evening Aarti time is required" : "संध्याकाळची आरती वेळ आवश्यक आहे", "error");
+      return;
+    }
+
     setIsSaving(true);
 
     // Sync top-level fields for backwards compatibility
@@ -1118,6 +1194,185 @@ const AartiScheduleManager = ({
         {showDailyAartiSection && (
           <form onSubmit={handleSaveAarti} className="space-y-6 animate-fadeIn">
             
+            {/* 0. PRIMARY CONTROL: DAILY MAHA AARTI ACTIVE PERIOD & TIMINGS */}
+            <div className="rounded-2xl border-2 border-gold-400 bg-gradient-to-br from-white via-[#FFFDF9] to-amber-50/50 p-5 sm:p-6 shadow-sm space-y-5">
+              
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gold-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-maroon-900 text-gold-300 flex items-center justify-center border border-gold-400 shadow-xs flex-shrink-0">
+                    <Calendar className="w-5 h-5 text-gold-300" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm sm:text-base font-black text-maroon-950 font-heading">
+                        {isEn ? "Daily Maha Aarti Active Period & Timings" : "दैनिक महाआरती सक्रिय कालावधी व वेळा"}
+                      </h4>
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-gold-200 text-maroon-900 border border-gold-400">
+                        {isEn ? "Auto Day & Timer" : "स्वयंचलित दिवस व टाइमर"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 mt-0.5">
+                      {isEn 
+                        ? "Configure the festival active date range and Aarti timings. Public site automatically calculates today's day (Day 1..10) and next Aarti countdown."
+                        : "उत्सवाचा सक्रिय कालावधी व आरत्यांच्या वेळा येथे सेट करा. मुख्य संकेतस्थळावर दिवस (Day 1..10) व काउंटडाऊन आपोआप अपडेट होईल."}
+                    </p>
+                  </div>
+                </div>
+
+                <FestiveButton
+                  type="submit"
+                  icon={Save}
+                  variant="primary"
+                  size="sm"
+                  disabled={isSaving}
+                >
+                  {isSaving ? (isEn ? "Saving..." : "जतन करत आहे...") : (isEn ? "Save Settings" : "सेटिंग्ज जतन करा")}
+                </FestiveButton>
+              </div>
+
+              {/* Date Pickers and Timings Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                {/* 1. Start Date */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-maroon-950 font-heading">
+                    {isEn ? "Start Date *" : "सुरू होणारा दिनांक (Start Date) *"}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={sectionHeaders.startDate || "2026-09-07"}
+                      onChange={(e) => setSectionHeaders(prev => ({ ...prev, startDate: e.target.value }))}
+                      required
+                      className="w-full px-3.5 py-2 rounded-xl text-xs font-bold border-2 border-gold-300 focus:border-gold-500 focus:ring-2 focus:ring-gold-400/40 bg-white text-maroon-950 shadow-2xs outline-none transition"
+                    />
+                  </div>
+                  <span className="text-[10px] text-stone-500 block">
+                    {isEn ? "Festival Day 1 starts here" : "येथून उत्सव दिवस १ सुरू होईल"}
+                  </span>
+                </div>
+
+                {/* 2. End Date */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-maroon-950 font-heading">
+                    {isEn ? "End Date *" : "समाप्त होणारा दिनांक (End Date) *"}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={sectionHeaders.endDate || "2026-09-16"}
+                      min={sectionHeaders.startDate || undefined}
+                      onChange={(e) => setSectionHeaders(prev => ({ ...prev, endDate: e.target.value }))}
+                      required
+                      className={`w-full px-3.5 py-2 rounded-xl text-xs font-bold border-2 focus:ring-2 bg-white text-maroon-950 shadow-2xs outline-none transition ${
+                        sectionHeaders.endDate && sectionHeaders.startDate && sectionHeaders.endDate < sectionHeaders.startDate
+                          ? "border-red-500 focus:border-red-600 focus:ring-red-300"
+                          : "border-gold-300 focus:border-gold-500 focus:ring-gold-400/40"
+                      }`}
+                    />
+                  </div>
+                  {sectionHeaders.endDate && sectionHeaders.startDate && sectionHeaders.endDate < sectionHeaders.startDate ? (
+                    <span className="text-[11px] text-red-600 font-bold flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      <span>{isEn ? "End date must be on or after the start date." : "समाप्ती तारीख ही सुरू होणाऱ्या तारखेच्या नंतरची किंवा तीच असावी."}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-stone-500 block">
+                      {isEn 
+                        ? `Total Duration: ${Math.max(0, diffInDays(sectionHeaders.endDate, sectionHeaders.startDate) + 1)} Days (Inclusive)` 
+                        : `एकूण कालावधी: ${Math.max(0, diffInDays(sectionHeaders.endDate, sectionHeaders.startDate) + 1)} दिवस (समावेशक)`}
+                    </span>
+                  )}
+                </div>
+
+                {/* 3. Morning Maha Aarti Time */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-maroon-950 font-heading">
+                    {isEn ? "Morning Maha Aarti *" : "सकाळची महाआरती वेळ *"}
+                  </label>
+                  <input
+                    type="text"
+                    value={sectionHeaders.morningTimeEn || "08:30 AM"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const time24 = parseTimeTo24h(val, "08:30");
+                      setSectionHeaders(prev => ({
+                        ...prev,
+                        morningTimeEn: val,
+                        morningTime: format24hTo12h(time24, "mr")
+                      }));
+                    }}
+                    placeholder="08:30 AM"
+                    required
+                    className="w-full px-3.5 py-2 rounded-xl text-xs font-bold border-2 border-gold-300 focus:border-gold-500 focus:ring-2 focus:ring-gold-400/40 bg-white text-maroon-950 shadow-2xs outline-none transition"
+                  />
+                  <span className="text-[10px] text-stone-500 block">
+                    {isEn ? `Marathi: ${sectionHeaders.morningTime || "सकाळी ०८:३० वाजता"}` : `इंग्रजी: ${sectionHeaders.morningTimeEn || "08:30 AM"}`}
+                  </span>
+                </div>
+
+                {/* 4. Evening Maha Aarti Time */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-maroon-950 font-heading">
+                    {isEn ? "Evening Maha Aarti *" : "संध्याकाळची महाआरती वेळ *"}
+                  </label>
+                  <input
+                    type="text"
+                    value={sectionHeaders.eveningTimeEn || "07:30 PM"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const time24 = parseTimeTo24h(val, "19:30");
+                      setSectionHeaders(prev => ({
+                        ...prev,
+                        eveningTimeEn: val,
+                        eveningTime: format24hTo12h(time24, "mr")
+                      }));
+                    }}
+                    placeholder="07:30 PM"
+                    required
+                    className="w-full px-3.5 py-2 rounded-xl text-xs font-bold border-2 border-gold-300 focus:border-gold-500 focus:ring-2 focus:ring-gold-400/40 bg-white text-maroon-950 shadow-2xs outline-none transition"
+                  />
+                  <span className="text-[10px] text-stone-500 block">
+                    {isEn ? `Marathi: ${sectionHeaders.eveningTime || "रात्री ०७:३० वाजता"}` : `इंग्रजी: ${sectionHeaders.eveningTimeEn || "07:30 PM"}`}
+                  </span>
+                </div>
+
+              </div>
+
+              {/* Requirement 17: Live Admin Preview Box */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-maroon-950 via-maroon-900 to-maroon-950 text-white border border-gold-400/80 shadow-md">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-gold-300 bg-maroon-800 px-2 py-0.5 rounded-full border border-gold-500/30">
+                      {isEn ? "Live Public Website Preview (Asia/Kolkata)" : "थेट मुख्य पान पूर्वावलोकन (IST)"}
+                    </span>
+                    <div className="mt-1.5 text-xs text-gold-100 flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span><strong>{isEn ? "Configured Period:" : "कालावधी:"}</strong> {sectionHeaders.startDate} → {sectionHeaders.endDate} ({Math.max(0, diffInDays(sectionHeaders.endDate, sectionHeaders.startDate) + 1)} {isEn ? "Days" : "दिवस"})</span>
+                      <span><strong>{isEn ? "Today's Festival Day:" : "आजचा उत्सव दिवस:"}</strong> {
+                        livePreview.festivalStatus === "active" 
+                          ? (isEn ? `Day ${livePreview.currentDay} (Today)` : `दिवस ${livePreview.currentDay} (आज)`)
+                          : livePreview.festivalStatus === "upcoming" 
+                            ? (isEn ? "Upcoming" : "आगामी") 
+                            : (isEn ? "Concluded" : "संपन्न")
+                      }</span>
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-gold-200">
+                      {livePreview.targetName} • <span className="text-gold-300">{livePreview.targetTime}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gold-300/80 font-bold uppercase">{isEn ? "Countdown:" : "काउंटडाऊन:"}</span>
+                    <div className="flex items-center gap-1 font-mono font-black text-gold-300 text-lg bg-maroon-800/90 px-3 py-1 rounded-xl border border-gold-400/60 shadow-inner">
+                      <span>{livePreview.hours}</span>:<span>{livePreview.minutes}</span>:<span>{livePreview.seconds}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
             {/* 1. SECTION TITLES & DISPLAY TEXTS ACCORDION */}
             <div className="rounded-2xl border-2 border-gold-300 bg-[#FFFDF9] overflow-hidden shadow-xs">
               <div 

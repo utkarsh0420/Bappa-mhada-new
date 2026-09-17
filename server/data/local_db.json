@@ -3,7 +3,7 @@
     {
       "_id": "admin_society_mhada",
       "email": "mhadatowersutsavmandal@gmail.com",
-      "passwordHash": "$2a$10$47wLS6UH7uED0.E.WRDfUOAR3bjt66SQZ.sYr5JI3ZtUQvkNkMGnG",
+      "passwordHash": "$2a$10$xH/e1Hr4auxGA2RokuYIsevQMoxvGXBS2G2JArgDYTu8.oDKO0iKC",
       "name": "म्हाडा उत्सव समिती अध्यक्ष (Admin)",
       "role": "admin",
       "createdAt": "2026-09-14T14:31:23.330Z"
@@ -340,15 +340,21 @@
       "titleMr": "दैनिक महाआरती व विंग यजमान",
       "titleEn": "Daily Maha Aarti & Host Wings",
       "subtitleMr": "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती",
-      "subtitleEn": "Every day at 08:30 AM and 07:30 PM near G wing ",
+      "subtitleEn": "Every day at 08:30 AM and 07:30 PM near G wing",
       "countdownLabelMr": "पुढील महाआरतीसाठी शिल्लक वेळ",
-      "countdownLabelEn": "Time Remaining Until Next Aarti"
+      "countdownLabelEn": "Time Remaining Until Next Aarti",
+      "startDate": "2026-09-17",
+      "endDate": "2026-09-26",
+      "morningTime": "सकाळी ०८:३० वाजता",
+      "morningTimeEn": "08:30 AM",
+      "eveningTime": "रात्री ०७:३० वाजता",
+      "eveningTimeEn": "07:30 PM"
     },
     "dailyAartiSchedule": [
       {
-        "dayNumber": 3,
-        "dateStr": "दिवस ३ (गणेश उत्सव- १६ सप्टेंबर)",
-        "dateStrEn": "Day 3 (Ganesh Utsav - 16  Sep)",
+        "dayNumber": 4,
+        "dateStr": "दिवस ४(गणेश उत्सव- १७ सप्टेंबर)",
+        "dateStrEn": "Day 4 (Ganesh Utsav - 17  Sep)",
         "tithi": "श्री गणेश चतुर्थी (मूर्ती प्राणप्रतिष्ठा)",
         "tithiEn": "Ganesh Chaturthi (Pranpratishtha)",
         "hostWing": "सर्व ५ इमारती संयुक्त (G • H • I • J • K WINGS)",
@@ -368,7 +374,7 @@
         "cultural": "दुपारी १२:०० ढोल-ताशा गजर व संध्याकाळी ६:०० लेझीम प्रात्यक्षिक",
         "culturalEn": "12:00 PM Dhol-Tasha & 6:00 PM Lezim Demonstration",
         "isCurrentDay": true,
-        "date": "2026-09-16",
+        "date": "2026-09-17",
         "events": [
           {
             "id": "evt_1_m",
@@ -847,7 +853,7 @@
         }
       ]
     },
-    "updatedAt": "2026-09-16T19:34:45.907Z",
+    "updatedAt": "2026-09-17T11:10:11.108Z",
     "festivalScheduleCard": {
       "eventNameMr": "श्री गणेशोत्सव २०२६ (१० दिवसीय भव्य उत्सव)",
       "eventNameEn": "Shree Ganeshotsav 2026 (10-Day Grand Celebration)",

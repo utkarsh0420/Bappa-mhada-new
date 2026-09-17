@@ -54,9 +54,15 @@ const dailyAartiSectionSchema = new mongoose.Schema({
   titleMr: { type: String, default: "दैनिक महाआरती व विंग यजमान" },
   titleEn: { type: String, default: "Daily Maha Aarti & Host Wings" },
   subtitleMr: { type: String, default: "दररोज सकाळी ०८:३० व रात्री ०८:०० वाजता मुख्य मंडपात महाआरती" },
-  subtitleEn: { type: String, default: "Every day at 08:30 AM and 08:00 PM at Central Festive Pandal" },
+  subtitleEn: { type: String, default: "Every day at 08:30 AM and 07:30 PM near G wing" },
   countdownLabelMr: { type: String, default: "पुढील महाआरतीसाठी शिल्लक वेळ" },
-  countdownLabelEn: { type: String, default: "Time Remaining Until Next Aarti" }
+  countdownLabelEn: { type: String, default: "Time Remaining Until Next Aarti" },
+  startDate: { type: String, default: "2026-09-07" },
+  endDate: { type: String, default: "2026-09-16" },
+  morningTime: { type: String, default: "सकाळी ०८:३० वाजता" },
+  morningTimeEn: { type: String, default: "08:30 AM" },
+  eveningTime: { type: String, default: "रात्री ०७:३० वाजता" },
+  eveningTimeEn: { type: String, default: "07:30 PM" }
 }, { _id: false, strict: false });
 
 const festivalScheduleCardSchema = new mongoose.Schema({
