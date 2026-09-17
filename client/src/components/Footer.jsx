@@ -3,9 +3,32 @@ import { Sparkles, Heart, Shield, Lock, Mail, Building2, Phone } from "lucide-re
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 
+// Official participating wings in strict required sequence: G -> H -> I -> J -> K
+const OFFICIAL_WING_ORDER = ["G", "H", "I", "J", "K"];
+
+const OFFICIAL_WINGS_DATA = {
+  G: { code: "G", nameMr: "G विंग - नंदादेवी", nameEn: "G Wing - Nandadevi" },
+  H: { code: "H", nameMr: "H विंग - निलगिरी", nameEn: "H Wing - Nilgiri" },
+  I: { code: "I", nameMr: "I विंग - ब्रह्मगिरी", nameEn: "I Wing - Brahmagiri" },
+  J: { code: "J", nameMr: "J विंग - पूर्वांचल", nameEn: "J Wing - Purvanchal" },
+  K: { code: "K", nameMr: "K विंग - गोवर्धन", nameEn: "K Wing - Govardhan" }
+};
+
 const Footer = ({ onOpenAdminLogin }) => {
   const { config } = useConfig();
   const { language, t } = useLanguage();
+
+  // Guaranteed official sequence: G -> H -> I -> J -> K
+  const displayWings = OFFICIAL_WING_ORDER.map((code) => {
+    const existing = config?.wings?.find(
+      (w) => w.code?.toUpperCase() === code
+    );
+    return {
+      code,
+      nameMr: existing?.nameMr || OFFICIAL_WINGS_DATA[code].nameMr,
+      nameEn: existing?.nameEn || OFFICIAL_WINGS_DATA[code].nameEn
+    };
+  });
 
   return (
     <footer className="bg-gradient-to-b from-maroon-950 via-maroon-900 to-[#180104] text-white border-t-2 border-gold-500/80 pt-10 pb-6 px-4">
@@ -48,23 +71,37 @@ const Footer = ({ onOpenAdminLogin }) => {
           </div>
 
           {/* Participating Buildings Info */}
-          <div className="text-center">
-            <div className="inline-block bg-maroon-850 px-5 py-3 rounded-2xl border border-gold-500/40 shadow-inner">
-              <span className="text-xs text-gold-300 font-bold block uppercase tracking-wide">
-                {language === "mr" ? "सहभागी इमारतींची एकता" : "Participating Buildings"}
+          <div className="text-center flex justify-center">
+            <div className="w-full max-w-sm sm:max-w-md bg-maroon-850 px-4 sm:px-5 py-3.5 rounded-2xl border border-gold-500/40 shadow-inner">
+              <span className="text-xs text-gold-300 font-bold block uppercase tracking-wider mb-2.5">
+                {language === "mr" ? "सहभागी इमारती" : "Participating Buildings"}
               </span>
-              <span className="text-xs sm:text-sm font-black text-white tracking-wide mt-1 block font-heading">
-                {config?.wings && config.wings.length > 0
-                  ? config.wings.map(w => w.nameMr || `${w.code} विंग`).join(" • ")
-                  : (config?.participatingWings || ["G", "H", "J", "K"]).map(w => `${w} विंग`).join(" • ")}
-              </span>
-              {(config?.mandalInfo?.email || config?.email) && (
+
+              {/* Official Wings List in Guaranteed Order G -> H -> I -> J -> K */}
+              <div className="flex flex-col gap-1.5 my-2">
+                {displayWings.map((wing) => (
+                  <div
+                    key={wing.code}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between px-3 py-1.5 rounded-xl bg-maroon-900/70 border border-gold-500/25 hover:border-gold-500/45 transition-colors gap-0.5 sm:gap-2 text-center sm:text-left"
+                  >
+                    <span className="font-heading font-black text-white text-xs sm:text-[13px] tracking-wide">
+                      {wing.nameMr}
+                    </span>
+                    <span className="text-[11px] text-gold-300/85 font-medium sm:text-right">
+                      {wing.nameEn}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Mandal Email */}
+              {(config?.mandalInfo?.email || config?.email || "mhadatowersutsavmandal@gmail.com") && (
                 <a 
-                  href={`mailto:${config?.mandalInfo?.email || config?.email}`} 
-                  className="text-[11px] text-gold-300/90 hover:text-white flex items-center justify-center gap-1 mt-1.5 underline"
+                  href={`mailto:${config?.mandalInfo?.email || config?.email || "mhadatowersutsavmandal@gmail.com"}`} 
+                  className="text-[11px] text-gold-300/90 hover:text-white inline-flex items-center justify-center gap-1.5 mt-2 underline transition-colors"
                 >
-                  <Mail className="w-3 h-3" />
-                  <span>{config?.mandalInfo?.email || config?.email}</span>
+                  <Mail className="w-3.5 h-3.5 text-gold-400 flex-shrink-0" />
+                  <span>{config?.mandalInfo?.email || config?.email || "mhadatowersutsavmandal@gmail.com"}</span>
                 </a>
               )}
             </div>
