@@ -6,6 +6,7 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useConfig } from "../context/ConfigContext";
 import API from "../services/api";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 export const ResidentPollsModal = ({ isOpen, onClose }) => {
   const { language } = useLanguage();
@@ -587,14 +588,19 @@ export const FestivalGalleryModal = ({ isOpen, onClose }) => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {gallery.map((item, idx) => {
-            const banner = item.bannerUrl || item.imageUrl;
+            const banner = getMediaUrl(item.bannerUrl || item.imageUrl);
             const title = language === "mr" ? (item.nameMr || item.titleMr) : (item.nameEn || item.titleEn || item.titleMr);
             const count = item.photos?.length || 0;
             return (
               <div key={item.id || idx} className="rounded-2xl border border-gold-300 p-3 bg-gradient-to-br from-[#FFFDF9] to-[#FAF5EC] shadow-xs">
                 {banner ? (
                   <div className="h-36 rounded-xl overflow-hidden mb-2 relative bg-black">
-                    <img src={banner} alt={title} className="w-full h-full object-cover" />
+                    <img 
+                      src={banner} 
+                      alt={title} 
+                      onError={handleImageError}
+                      className="w-full h-full object-cover" 
+                    />
                     {item.category && (
                       <span className="absolute top-2 right-2 text-[9px] bg-amber-500 text-maroon-950 font-black px-2 py-0.5 rounded-full">
                         {item.category}

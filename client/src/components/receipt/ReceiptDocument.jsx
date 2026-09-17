@@ -1,5 +1,6 @@
 import React, { forwardRef } from "react";
 import "./ReceiptDocument.css";
+import { getMediaUrl, handleImageError } from "../../utils/mediaUrl";
 
 // Helper for Indian English number to words if not passed
 const numberToWordsIndian = (num) => {
@@ -70,12 +71,10 @@ const ReceiptDocument = forwardRef(({ receipt, config, sachivSignatureUrl, forPr
           <div className="receipt-header-row">
             <div className="receipt-logo-box">
               <img
-                src="/logo.jpg"
+                src={getMediaUrl("/logo.jpg")}
                 alt="Mandal Official Logo"
                 className="receipt-logo-img"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                }}
+                onError={handleImageError}
               />
             </div>
             
@@ -195,12 +194,10 @@ const ReceiptDocument = forwardRef(({ receipt, config, sachivSignatureUrl, forPr
               <div className="receipt-signature-img-area">
                 {signatureSrc ? (
                   <img
-                    src={signatureSrc}
+                    src={getMediaUrl(signatureSrc)}
                     alt="Digital Signature"
                     className="receipt-signature-img"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                    }}
+                    onError={handleImageError}
                   />
                 ) : (
                   <span className="receipt-signature-placeholder">

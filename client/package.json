@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node ../scripts/sync-uploads.js || exit 0",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"

@@ -13,6 +13,7 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import { formatEventsScheduleBroadcast, formatSingleEvent, openWhatsApp } from "../../utils/whatsappFormatter";
 import { triggerLiveSync } from "../../utils/liveSync";
+import { getMediaUrl, handleImageError } from "../../utils/mediaUrl";
 
 const EVENT_CATEGORIES_MR = [
   { value: "cultural", label: "सांस्कृतिक कार्यक्रम (Cultural)" },
@@ -657,7 +658,12 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               {form.imageUrl ? (
                 <div className="relative group w-36 h-24 rounded-xl overflow-hidden border-2 border-gold-400 shadow-sm flex-shrink-0 bg-stone-100">
-                  <img src={form.imageUrl} alt="Event poster preview" className="w-full h-full object-cover" />
+                  <img 
+                    src={getMediaUrl(form.imageUrl)} 
+                    alt="Event poster preview" 
+                    onError={handleImageError}
+                    className="w-full h-full object-cover" 
+                  />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition">
                     <button
                       type="button"
@@ -851,7 +857,12 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
                         className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-2 border-gold-300 shadow-2xs cursor-pointer flex-shrink-0 group relative bg-stone-100 mt-0.5"
                         title={isEn ? "Click to view full photo" : "फोटो मोठा पाहण्यासाठी क्लिक करा"}
                       >
-                        <img src={ev.imageUrl} alt={ev.titleMr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <img 
+                          src={getMediaUrl(ev.imageUrl)} 
+                          alt={ev.titleMr} 
+                          onError={handleImageError}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
                           <Eye className="w-4 h-4" />
                         </div>
@@ -963,7 +974,12 @@ const EventManager = ({ events, onRefresh, onNotify, config }) => {
           onClick={() => setPreviewModalImg(null)}
         >
           <div className="relative max-w-2xl max-h-[90vh] bg-white rounded-2xl overflow-hidden p-2 border-2 border-gold-400 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <img src={previewModalImg} alt="Preview" className="max-w-full max-h-[80vh] object-contain rounded-xl mx-auto" />
+            <img 
+              src={getMediaUrl(previewModalImg)} 
+              alt="Preview" 
+              onError={handleImageError}
+              className="max-w-full max-h-[80vh] object-contain rounded-xl mx-auto" 
+            />
             <button
               onClick={() => setPreviewModalImg(null)}
               className="absolute top-4 right-4 p-2 rounded-full bg-black/70 hover:bg-black text-white transition cursor-pointer"

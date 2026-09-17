@@ -11,6 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import API from "../services/api";
 import { triggerLiveSync } from "../utils/liveSync";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 import TabApprovals from "./admin/TabApprovals";
 import NewsletterManager from "./admin/NewsletterManager";
@@ -201,8 +202,9 @@ const AdminDashboard = ({ onClose }) => {
               <div className="relative flex-shrink-0">
                 <div className="absolute -inset-1 bg-gradient-to-r from-gold-400 via-amber-300 to-gold-600 rounded-full blur-xs opacity-80" />
                 <img
-                  src="/logo.jpg"
+                  src={getMediaUrl("/logo.jpg")}
                   alt="म्हाडा लोगो"
+                  onError={handleImageError}
                   className="relative w-8 h-8 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-gold-400 shadow-md"
                 />
               </div>

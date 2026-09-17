@@ -42,8 +42,20 @@ app.use(cors({
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
-// Serve uploaded media statically
-app.use("/uploads", express.static(uploadsDir));
+// Serve uploaded media statically with open CORS and caching headers
+app.use("/uploads", (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  next();
+}, express.static(uploadsDir));
+
+// Fallback to client/dist/uploads if present
+const clientDistUploads = path.join(__dirname, "../client/dist/uploads");
+if (fs.existsSync(clientDistUploads)) {
+  app.use("/uploads", express.static(clientDistUploads));
+}
 
 // API Routes
 app.use("/api/auth", authRoutes);

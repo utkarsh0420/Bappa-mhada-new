@@ -9,6 +9,7 @@ import {
 } from "./FestiveControls";
 import { useLanguage } from "../../context/LanguageContext";
 import API from "../../services/api";
+import { getMediaUrl, handleImageError } from "../../utils/mediaUrl";
 
 const GalleryManager = ({ config, onSaveGallery, onNotify }) => {
   const { language } = useLanguage();
@@ -446,8 +447,9 @@ const GalleryManager = ({ config, onSaveGallery, onNotify }) => {
                   <div className="w-14 h-12 rounded-lg border border-gold-300 bg-maroon-950 flex-shrink-0 overflow-hidden flex items-center justify-center relative">
                     {festival.bannerUrl ? (
                       <img 
-                        src={festival.bannerUrl} 
+                        src={getMediaUrl(festival.bannerUrl)} 
                         alt="Banner" 
+                        onError={handleImageError}
                         className="w-full h-full object-cover" 
                       />
                     ) : (
@@ -631,8 +633,9 @@ const GalleryManager = ({ config, onSaveGallery, onNotify }) => {
                         ) : festival.bannerUrl ? (
                           <>
                             <img
-                              src={festival.bannerUrl}
+                              src={getMediaUrl(festival.bannerUrl)}
                               alt="Festival Banner"
+                              onError={handleImageError}
                               className="w-full h-full object-cover cursor-pointer hover:scale-105 transition"
                               onClick={() => setPreviewModalImg(festival.bannerUrl)}
                             />
@@ -772,8 +775,9 @@ const GalleryManager = ({ config, onSaveGallery, onNotify }) => {
                             {/* Thumbnail */}
                             <div className="relative h-28 w-full rounded-lg bg-black overflow-hidden flex items-center justify-center">
                               <img
-                                src={photo.url}
+                                src={getMediaUrl(photo.url)}
                                 alt={photo.captionMr || "Festival photo"}
+                                onError={handleImageError}
                                 className="w-full h-full object-cover cursor-pointer hover:scale-105 transition"
                                 onClick={() => setPreviewModalImg(photo.url)}
                               />
@@ -907,8 +911,9 @@ const GalleryManager = ({ config, onSaveGallery, onNotify }) => {
               <X className="w-5 h-5" />
             </button>
             <img 
-              src={previewModalImg} 
+              src={getMediaUrl(previewModalImg)} 
               alt="Photo preview" 
+              onError={handleImageError}
               className="max-h-[80vh] w-auto object-contain rounded-2xl p-2" 
             />
             <div className="p-2 text-center text-xs text-gold-300 font-mono truncate max-w-full px-4">
@@ -953,7 +958,12 @@ const GalleryManager = ({ config, onSaveGallery, onNotify }) => {
             <div className="overflow-y-auto p-4 sm:p-6 space-y-4 bg-gradient-to-b from-[#FFFDF9] to-[#FAF5EC]">
               {previewFestival.bannerUrl && (
                 <div className="h-56 rounded-2xl overflow-hidden border-2 border-gold-300 relative bg-black shadow-md">
-                  <img src={previewFestival.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                  <img 
+                    src={getMediaUrl(previewFestival.bannerUrl)} 
+                    alt="Banner" 
+                    onError={handleImageError}
+                    className="w-full h-full object-cover" 
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent flex flex-col justify-end p-4 text-white">
                     <span className="text-[10px] text-gold-300 font-bold uppercase">{isEn ? "Banner Photo" : "मुख्य कव्हर"}</span>
                     <h3 className="text-lg sm:text-xl font-black text-gold-100 font-heading">
@@ -980,7 +990,12 @@ const GalleryManager = ({ config, onSaveGallery, onNotify }) => {
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {previewFestival.photos.map((p, idx) => (
                       <div key={p.id || idx} className="h-28 rounded-xl overflow-hidden border border-gold-300 bg-black">
-                        <img src={p.url} alt="Photo" className="w-full h-full object-cover" />
+                        <img 
+                          src={getMediaUrl(p.url)} 
+                          alt="Photo" 
+                          onError={handleImageError}
+                          className="w-full h-full object-cover" 
+                        />
                       </div>
                     ))}
                   </div>

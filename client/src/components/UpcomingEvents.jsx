@@ -8,6 +8,7 @@ import { useConfig } from "../context/ConfigContext";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import { subscribeLiveSync } from "../utils/liveSync";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 export const UPCOMING_FESTIVAL_EVENTS = [];
 export const YEARLY_EVENTS = [];
@@ -251,7 +252,12 @@ const UpcomingEvents = ({ onOpenUpcomingCalendar }) => {
                         className="relative w-full h-36 sm:h-44 rounded-xl overflow-hidden cursor-pointer group border border-gold-300 shadow-2xs mb-3 bg-stone-100"
                         title={language === "mr" ? "फोटो व सविस्तर माहिती पहा" : "View Photo & Details"}
                       >
-                        <img src={ev.imageUrl} alt={ev.titleMr} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <img 
+                          src={getMediaUrl(ev.imageUrl)} 
+                          alt={ev.titleMr} 
+                          onError={handleImageError}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white gap-2 font-bold text-xs">
                           <Eye className="w-4 h-4 text-gold-300" />
                           <span>{language === "mr" ? "फोटो व तपशील पहा" : "View Photo & Details"}</span>
@@ -429,8 +435,9 @@ const UpcomingEvents = ({ onOpenUpcomingCalendar }) => {
                 {selectedEventModal.imageUrl && (
                   <div className="rounded-2xl overflow-hidden border-2 border-gold-300 shadow-md bg-stone-100 max-h-[50vh] flex items-center justify-center">
                     <img 
-                      src={selectedEventModal.imageUrl} 
+                      src={getMediaUrl(selectedEventModal.imageUrl)} 
                       alt={selectedEventModal.titleMr} 
+                      onError={handleImageError}
                       className="w-full max-h-[50vh] object-contain rounded-xl"
                     />
                   </div>

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { useConfig } from "../context/ConfigContext";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 export const PAST_PHOTOS_DATA = [];
 
@@ -172,11 +173,9 @@ const PhotoGallery = () => {
                 {festival.bannerUrl ? (
                   <div className="h-48 relative overflow-hidden bg-maroon-950">
                     <img 
-                      src={festival.bannerUrl} 
+                      src={getMediaUrl(festival.bannerUrl)} 
                       alt={festivalTitle} 
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                      }}
+                      onError={handleImageError}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-500" 
                     />
                     
@@ -315,8 +314,9 @@ const PhotoGallery = () => {
               {activeFestival.bannerUrl ? (
                 <div className="relative rounded-2xl overflow-hidden border-2 border-gold-300 shadow-md max-h-64 sm:max-h-72 bg-black">
                   <img 
-                    src={activeFestival.bannerUrl} 
+                    src={getMediaUrl(activeFestival.bannerUrl)} 
                     alt={activeFestival.nameMr || activeFestival.titleMr} 
+                    onError={handleImageError}
                     className="w-full h-full object-cover max-h-64 sm:max-h-72" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent flex flex-col justify-end p-4 sm:p-6 text-white">
@@ -373,9 +373,10 @@ const PhotoGallery = () => {
                         >
                           <div className="h-32 sm:h-36 w-full overflow-hidden bg-black flex items-center justify-center relative">
                             <img
-                              src={photo.url}
+                              src={getMediaUrl(photo.url)}
                               alt={photoCaption || `Photo ${pIdx + 1}`}
                               className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                              onError={handleImageError}
                             />
                             <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <span className="bg-black/60 text-gold-200 p-2 rounded-full backdrop-blur-xs">
@@ -461,8 +462,9 @@ const PhotoGallery = () => {
             {/* Image Viewer with Next & Prev Controls */}
             <div className="relative w-full flex items-center justify-center max-h-[80vh] overflow-hidden">
               <img
-                src={activePhotoItem.url}
+                src={getMediaUrl(activePhotoItem.url)}
                 alt={activePhotoItem.captionMr || "Festival Zoomed"}
+                onError={handleImageError}
                 className="max-h-[78vh] max-w-full w-auto object-contain rounded-xl shadow-2xl border border-gold-500/30"
               />
 

@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { ExpandableTabs } from "./ui/expandable-tabs";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 const Header = ({ 
   onOpenAdminLogin, 
@@ -170,12 +171,10 @@ const Header = ({
               {/* Gold Ring Aura */}
               <div className="absolute -inset-1 bg-gradient-to-r from-gold-400 via-amber-300 to-gold-600 rounded-full blur-xs opacity-80 group-hover:opacity-100 transition duration-300"></div>
               <img
-                src="/logo.jpg"
+                src={getMediaUrl("/logo.jpg")}
                 alt="म्हाडा टॉवर्स उत्सव मंडळ लोगो"
                 className="relative w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full object-cover border-2 border-gold-400 shadow-xl"
-                onError={(e) => {
-                  console.error("Logo failed to load");
-                }}
+                onError={handleImageError}
               />
             </div>
 

@@ -13,6 +13,7 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import { formatAartiScheduleBroadcast, formatSingleAartiDay, openWhatsApp } from "../../utils/whatsappFormatter";
 import API from "../../services/api";
+import { getMediaUrl, handleImageError } from "../../utils/mediaUrl";
 import { 
   calculateFestivalDay, 
   calculateAartiCountdown, 
@@ -725,8 +726,9 @@ const AartiScheduleManager = ({
                   title={isEn ? "Click to view full image pop-up" : "पूर्ण फोटो पॉपअप पाहण्यासाठी क्लिक करा"}
                 >
                   <img 
-                    src={cardForm.imageUrl} 
+                    src={getMediaUrl(cardForm.imageUrl)} 
                     alt="Schedule Photo" 
+                    onError={handleImageError}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -859,9 +861,10 @@ const AartiScheduleManager = ({
                   {/* Photo Thumbnail */}
                   <div className="relative rounded-xl overflow-hidden border-2 border-gold-300 bg-stone-900 group">
                     <img 
-                      src={cardForm.imageUrl} 
+                      src={getMediaUrl(cardForm.imageUrl)} 
                       alt="Festival Schedule Preview" 
-                      className="w-full h-48 sm:h-56 object-contain bg-stone-900"
+                      onError={handleImageError}
+                      className="w-full h-48 sm:h-56 object-contain bg-stone-900" 
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <button
@@ -1905,9 +1908,10 @@ const AartiScheduleManager = ({
             {/* High-Resolution Display Image */}
             <div className="w-full flex justify-center overflow-hidden rounded-2xl border-2 border-gold-400/90 shadow-2xl bg-black/60">
               <img 
-                src={previewModalImg} 
+                src={getMediaUrl(previewModalImg)} 
                 alt="Schedule Preview" 
-                className="max-w-full max-h-[82vh] object-contain rounded-2xl"
+                onError={handleImageError}
+                className="max-w-full max-h-[82vh] object-contain rounded-2xl" 
               />
             </div>
 

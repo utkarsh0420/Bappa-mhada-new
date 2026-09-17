@@ -14,6 +14,7 @@ import { useAuth } from "../../context/AuthContext";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ReceiptDocument from "../../components/receipt/ReceiptDocument";
+import { getMediaUrl, handleImageError } from "../../utils/mediaUrl";
 
 // Number to Words in Indian English
 const numberToWordsIndian = (num) => {
@@ -1182,8 +1183,9 @@ _म्हाडा टॉवर्स उत्सव मंडळ_`;
                 <div className="p-3 bg-gold-50/50 rounded-xl border border-gold-200 text-center space-y-2">
                   <div className="h-20 bg-white rounded-lg border border-stone-200 p-2 flex items-center justify-center">
                     <img
-                      src={receiptSettings.sachivSignatureUrl}
+                      src={getMediaUrl(receiptSettings.sachivSignatureUrl)}
                       alt="SACHIV Digital Signature"
+                      onError={handleImageError}
                       className="max-h-full max-w-full object-contain"
                     />
                   </div>
@@ -1218,8 +1220,9 @@ _म्हाडा टॉवर्स उत्सव मंडळ_`;
               </h4>
               <div className="flex items-center gap-3">
                 <img
-                  src="/logo.jpg"
+                  src={getMediaUrl("/logo.jpg")}
                   alt="Mandal Logo"
+                  onError={handleImageError}
                   className="w-12 h-12 rounded-lg object-cover border border-gold-300 shadow-xs"
                 />
                 <div>
@@ -1661,8 +1664,9 @@ _म्हाडा टॉवर्स उत्सव मंडळ_`;
               <div className="space-y-4">
                 <div className="inline-block p-4 bg-white rounded-xl border border-gold-300 shadow-sm">
                   <img
-                    src={receiptSettings.sachivSignatureUrl}
+                    src={getMediaUrl(receiptSettings.sachivSignatureUrl)}
                     alt="Current Digital Signature"
+                    onError={handleImageError}
                     className="max-h-28 max-w-xs object-contain mx-auto"
                   />
                   <div className="mt-2 pt-2 border-t border-stone-200 text-center">

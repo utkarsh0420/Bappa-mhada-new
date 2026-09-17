@@ -2,6 +2,7 @@ import React from "react";
 import { Sparkles, Heart, Shield, Lock, Mail, Building2, Phone } from "lucide-react";
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 // Official participating wings in strict required sequence: G -> H -> I -> J -> K
 const OFFICIAL_WING_ORDER = ["G", "H", "I", "J", "K"];
@@ -51,8 +52,9 @@ const Footer = ({ onOpenAdminLogin }) => {
           {/* Logo & Mandal Profile */}
           <div className="flex flex-col md:flex-row items-center gap-4">
             <img
-              src="/logo.jpg"
+              src={getMediaUrl("/logo.jpg")}
               alt="म्हाडा टॉवर्स उत्सव मंडळ"
+              onError={handleImageError}
               className="w-16 h-16 rounded-full border-2 border-gold-400 shadow-lg object-cover flex-shrink-0"
             />
             <div>

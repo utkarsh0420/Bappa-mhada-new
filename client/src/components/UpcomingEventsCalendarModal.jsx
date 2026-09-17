@@ -11,6 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
 import { triggerLiveSync, subscribeLiveSync } from "../utils/liveSync";
 import { getAllWingsLabel } from "../utils/wingUtils";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 // Local image compression helper for uploading photos from device
 const compressImageFile = (file, maxWidth = 1000, quality = 0.75) => {
@@ -994,7 +995,12 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
                                     className="w-10 h-10 rounded-lg overflow-hidden border border-gold-300 hover:scale-105 transition shadow-2xs inline-block bg-stone-100 cursor-pointer"
                                     title={language === "mr" ? "फोटो पहा" : "View photo"}
                                   >
-                                    <img src={ev.imageUrl} alt={ev.titleMr} className="w-full h-full object-cover" />
+                                    <img 
+                                      src={getMediaUrl(ev.imageUrl)} 
+                                      alt={ev.titleMr} 
+                                      onError={handleImageError}
+                                      className="w-full h-full object-cover" 
+                                    />
                                   </button>
                                 ) : (
                                   <span className="text-[10px] text-stone-300">-</span>
@@ -1088,7 +1094,12 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
                             className="relative w-full h-36 sm:h-44 rounded-xl overflow-hidden cursor-pointer group border border-gold-300 shadow-2xs bg-stone-100"
                             title={language === "mr" ? "फोटो मोठा पहा" : "View photo"}
                           >
-                            <img src={ev.imageUrl} alt={ev.titleMr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            <img 
+                              src={getMediaUrl(ev.imageUrl)} 
+                              alt={ev.titleMr} 
+                              onError={handleImageError}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                            />
                             <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white gap-1.5 font-bold text-xs">
                               <Eye className="w-4 h-4" />
                               <span>{language === "mr" ? "फोटो पहा" : "View Flyer"}</span>
@@ -1384,7 +1395,12 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
                   <div className="flex items-center gap-3">
                     {eventFormData.imageUrl ? (
                       <div className="relative group w-24 h-16 rounded-xl overflow-hidden border border-gold-400 flex-shrink-0 bg-stone-100">
-                        <img src={eventFormData.imageUrl} alt="Attached" className="w-full h-full object-cover" />
+                        <img 
+                          src={getMediaUrl(eventFormData.imageUrl)} 
+                          alt="Attached" 
+                          onError={handleImageError}
+                          className="w-full h-full object-cover" 
+                        />
                         <button
                           type="button"
                           onClick={() => setEventFormData(prev => ({ ...prev, imageUrl: "" }))}
@@ -1466,7 +1482,12 @@ export const UpcomingEventsCalendarModal = ({ isOpen, onClose, defaultTab = "fes
             onClick={() => setLightboxImg(null)}
           >
             <div className="relative max-w-2xl max-h-[90vh] bg-white rounded-2xl overflow-hidden p-2 border-2 border-gold-400 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <img src={lightboxImg} alt="Preview" className="max-w-full max-h-[80vh] object-contain rounded-xl mx-auto" />
+              <img 
+                src={getMediaUrl(lightboxImg)} 
+                alt="Preview" 
+                onError={handleImageError}
+                className="max-w-full max-h-[80vh] object-contain rounded-xl mx-auto" 
+              />
               <button
                 onClick={() => setLightboxImg(null)}
                 className="absolute top-4 right-4 p-2 rounded-full bg-black/70 hover:bg-black text-white transition cursor-pointer"

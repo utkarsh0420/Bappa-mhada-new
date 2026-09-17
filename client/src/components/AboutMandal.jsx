@@ -6,6 +6,7 @@ import {
 import { useConfig } from "../context/ConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { getAllWingsShortLabel, getWingCodesText } from "../utils/wingUtils";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 const ICON_MAP = {
   HeartHandshake,
@@ -81,10 +82,10 @@ const AboutMandal = () => {
             <div className="relative mb-3">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full p-1 bg-gradient-to-tr from-gold-400 via-amber-300 to-gold-500 shadow-xl overflow-hidden flex items-center justify-center bg-white">
                 <img
-                  src="/logo.jpg"
+                  src={getMediaUrl("/logo.jpg")}
                   alt="म्हाडा टॉवर्स लोगो"
                   className="w-full h-full rounded-full object-cover"
-                  onError={(e) => { e.target.style.display = 'none'; }}
+                  onError={handleImageError}
                 />
               </div>
             </div>

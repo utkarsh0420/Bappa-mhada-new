@@ -10,6 +10,7 @@ import {
   getWingNamesText, 
   getAllWingsLabel 
 } from "../utils/wingUtils";
+import { getMediaUrl, handleImageError } from "../utils/mediaUrl";
 
 export const TEN_DAYS_DATA = [];
 
@@ -70,7 +71,7 @@ const TenDaysSchedule = () => {
       : `All ${wingsCount} Building Wing Leads, Women's Wing & Volunteer Squad (Wings ${wingsCodes})`
   );
 
-  const imageUrl = cardData.imageUrl || "";
+  const imageUrl = getMediaUrl(cardData.imageUrl || "");
   const imageCaption = language === "mr"
     ? (cardData.imageCaptionMr || "उत्सव वेळापत्रक व संपूर्ण कार्यक्रम रूपरेषा")
     : (cardData.imageCaptionEn || cardData.imageCaptionMr || "Festival Schedule & Complete Event Blueprint");
@@ -214,6 +215,7 @@ const TenDaysSchedule = () => {
                     <img 
                       src={imageUrl} 
                       alt={eventName} 
+                      onError={handleImageError}
                       className="w-full h-56 sm:h-64 object-cover object-center group-hover:scale-105 transition-transform duration-300"
                     />
                     
@@ -285,6 +287,7 @@ const TenDaysSchedule = () => {
               <img 
                 src={imageUrl} 
                 alt={eventName} 
+                onError={handleImageError}
                 className="max-w-full max-h-[82vh] object-contain rounded-2xl"
               />
             </div>
