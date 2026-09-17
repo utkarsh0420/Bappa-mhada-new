@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Newspaper, Building, Flame, ShieldCheck, 
   Sparkles, Clock, Calendar, Check, Copy, 
@@ -9,6 +9,14 @@ import { useLanguage } from "../context/LanguageContext";
 import { useConfig } from "../context/ConfigContext";
 import { formatNewsletterBroadcast, copyToClipboard } from "../utils/whatsappFormatter";
 import { getWingsCount, getAllWingsLabel } from "../utils/wingUtils";
+import { 
+  getKolkataDate, 
+  calculateFestivalDay, 
+  addDaysToDateStr, 
+  diffInDays, 
+  formatKolkataDateString, 
+  toMarathiNumeral 
+} from "../utils/aartiDateUtils";
 
 // Category icon and festive styling mapping
 const getCategoryMeta = (category) => {
@@ -47,43 +55,116 @@ const DailyNewsletter = ({ onOpenUpcomingCalendar }) => {
   }
 
   const nl = config?.newsletter || {};
+  const startDate = nl.startDate || "2026-09-07";
+  const endDate = nl.endDate || "2026-09-16";
+  const showSelectDay = nl.showSelectDay !== false;
+  const showTodayBadge = nl.showTodayBadge !== false;
+  const showCurrentDay = nl.showCurrentDay !== false;
+
   const wingsCount = getWingsCount(config);
   const allWingsLabel = getAllWingsLabel(config, language);
 
-  // 2. Resolve Days: Prefer dynamic newsletter.days if configured, otherwise fallback to dailyAartiSchedule
-  const rawDays = (nl.days && Array.isArray(nl.days) && nl.days.length > 0)
-    ? nl.days
-    : (config?.dailyAartiSchedule || config?.tenDaysAartiSchedule || []);
+  // 2. Automatic Date / Day calculation in Asia/Kolkata timezone
+  const todayKolkata = getKolkataDate();
+  const festivalInfo = calculateFestivalDay(startDate, endDate, todayKolkata);
+  const totalDays = festivalInfo.totalDays > 0 ? festivalInfo.totalDays : 10;
+  const activeFestivalDay = festivalInfo.status === "active" ? festivalInfo.currentDay : null;
 
-  const daysList = rawDays.filter(d => d && d.isActive !== false);
+  // 3. Resolve Dynamic Days list for the configured period
+  const resolvedDays = useMemo(() => {
+    const rawDays = (nl.days && Array.isArray(nl.days) && nl.days.length > 0)
+      ? nl.days.filter(d => d && d.isActive !== false)
+      : (config?.dailyAartiSchedule || config?.tenDaysAartiSchedule || []);
 
-  // Find current active day marked by admin
-  const currentDayIndex = daysList.findIndex((d) => d.isCurrentDay);
-  const defaultIdx = currentDayIndex !== -1 ? currentDayIndex : 0;
+    const daysCount = totalDays > 0 ? totalDays : (rawDays.length > 0 ? rawDays.length : 10);
+    const result = [];
+    const templateDay = rawDays[0] || {};
+
+    for (let n = 1; n <= daysCount; n++) {
+      const dayDateStr = addDaysToDateStr(startDate, n - 1);
+      const shortDateEn = formatKolkataDateString(dayDateStr, "en", false);
+      const fullDateEn = formatKolkataDateString(dayDateStr, "en", true);
+      const shortDateMr = formatKolkataDateString(dayDateStr, "mr", false);
+      const fullDateMr = formatKolkataDateString(dayDateStr, "mr", true);
+      const nMr = toMarathiNumeral(n);
+
+      const existing = rawDays.find(d => Number(d.dayNumber) === n) 
+        || (rawDays.length === 1 ? rawDays[0] : (rawDays[n - 1] || templateDay));
+
+      const isToday = (activeFestivalDay !== null && activeFestivalDay === n);
+      const festivalNameEn = nl.festivalName || "Ganesh Utsav";
+      const festivalNameMr = nl.festivalNameMr || "गणेश उत्सव";
+
+      result.push({
+        ...existing,
+        id: existing.id || `day_${n}`,
+        dayNumber: n,
+        isCurrentDay: isToday,
+        dateStr: shortDateEn,
+        dateStrEn: fullDateEn,
+        dateStrMr: fullDateMr,
+        festivalDayLabel: `Day ${n} (${festivalNameEn} - ${shortDateEn})`,
+        festivalDayLabelMr: `दिवस ${nMr} (${festivalNameMr} - ${shortDateMr})`,
+        headline: existing.headline || nl.headline || "Ganpati Festival Live",
+        headlineMr: existing.headlineMr || nl.headlineMr || "गणपती उत्सव थेट (लाइव्ह)",
+        subtitle: existing.subtitle || nl.subtitle || `All ${wingsCount} wings are participated`,
+        subtitleMr: existing.subtitleMr || nl.subtitleMr || `सर्व ${wingsCount} इमारतींचा संयुक्त सहभाग`,
+        blocks: (existing.blocks && existing.blocks.length > 0) ? existing.blocks : (templateDay.blocks || [])
+      });
+    }
+    return result;
+  }, [startDate, endDate, totalDays, activeFestivalDay, nl.days, nl.festivalName, nl.festivalNameMr, nl.headline, nl.headlineMr, nl.subtitle, nl.subtitleMr, config?.dailyAartiSchedule, wingsCount]);
+
+  // Default selected day index: matches current active day, or 0 if upcoming / concluded
+  const defaultIdx = useMemo(() => {
+    if (activeFestivalDay !== null) {
+      const foundIdx = resolvedDays.findIndex(d => d.dayNumber === activeFestivalDay);
+      if (foundIdx !== -1) return foundIdx;
+    }
+    return 0;
+  }, [activeFestivalDay, resolvedDays]);
+
   const [selectedDayIdx, setSelectedDayIdx] = useState(defaultIdx);
 
-  // Auto-sync active day whenever admin changes isCurrentDay in live sync
+  // Auto-sync selected day when activeFestivalDay or period changes
   useEffect(() => {
-    if (currentDayIndex !== -1) {
-      setSelectedDayIdx(currentDayIndex);
-    }
-  }, [currentDayIndex, nl.days, config?.dailyAartiSchedule]);
+    setSelectedDayIdx(defaultIdx);
+  }, [defaultIdx]);
 
-  const activeDay = daysList[selectedDayIdx] || daysList[defaultIdx] || daysList[0] || {};
+  const activeDay = resolvedDays[selectedDayIdx] || resolvedDays[defaultIdx] || resolvedDays[0] || {};
   const dayNum = activeDay.dayNumber || (selectedDayIdx + 1);
 
-  // 3. Dynamic Header & General Values
+  // 4. Dynamic Header & General Values
   const bulletinTitle = language === "mr"
     ? (nl.bulletinTitleMr || nl.bulletinTitle || "दैनिक डिजिटल वृत्तपत्र")
     : (nl.bulletinTitle || "DAILY DIGITAL BULLETIN");
 
   const eventDuration = language === "mr"
-    ? (nl.eventDurationMr || nl.eventDuration || "१ दिवसीय सोहळा")
-    : (nl.eventDuration || "1 day event");
+    ? (nl.eventDurationMr || nl.eventDuration || `${toMarathiNumeral(totalDays)} दिवसीय सोहळा`)
+    : (nl.eventDuration || `${totalDays} day event`);
 
-  const dayLabel = language === "mr"
-    ? (activeDay.festivalDayLabelMr || activeDay.festivalDayLabel || activeDay.dateStr || `दिवस ${dayNum}`)
-    : (activeDay.festivalDayLabel || activeDay.festivalDayLabelMr || activeDay.dateStrEn || activeDay.dateStr || `Day ${dayNum}`);
+  // Resolve header day label based on festival status
+  let dynamicDayLabel = "";
+  if (festivalInfo.status === "upcoming") {
+    const daysUntil = festivalInfo.daysUntil || 1;
+    const startFormatted = formatKolkataDateString(startDate, language === "mr" ? "mr" : "en", false);
+    dynamicDayLabel = language === "mr"
+      ? `आगामी • ${startFormatted} पासून (${toMarathiNumeral(daysUntil)} दिवसांत सुरू)`
+      : `Upcoming • Starts ${startFormatted} (in ${daysUntil} ${daysUntil === 1 ? "day" : "days"})`;
+  } else if (festivalInfo.status === "concluded") {
+    dynamicDayLabel = language === "mr"
+      ? "उत्सव सांगता संपन्न"
+      : "Festival Concluded";
+  } else {
+    // Active festival period
+    dynamicDayLabel = language === "mr"
+      ? (activeDay.festivalDayLabelMr || `दिवस ${toMarathiNumeral(dayNum)}`)
+      : (activeDay.festivalDayLabel || `Day ${dayNum}`);
+  }
+
+  const dayLabel = showCurrentDay
+    ? dynamicDayLabel
+    : (language === "mr" ? (activeDay.festivalDayLabelMr || `दिवस ${toMarathiNumeral(dayNum)}`) : (activeDay.festivalDayLabel || `Day ${dayNum}`));
 
   const headline = language === "mr"
     ? (activeDay.headlineMr || activeDay.headline || nl.headlineMr || nl.headline || activeDay.tithi || "गणपती उत्सव थेट (लाइव्ह)")
@@ -488,7 +569,7 @@ const DailyNewsletter = ({ onOpenUpcomingCalendar }) => {
               • {dayLabel}
             </span>
 
-            {activeDay.isCurrentDay && (
+            {showTodayBadge && activeDay.isCurrentDay && (
               <span className="inline-flex items-center gap-1 text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded-full shadow-xs animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
                 {language === "mr" ? "आजचा दिवस (Today)" : "Today's Day"}
@@ -538,39 +619,42 @@ const DailyNewsletter = ({ onOpenUpcomingCalendar }) => {
         {displayStyle !== "timeline" && displayStyle !== "grid" && displayStyle !== "bulletin" && renderClassicCards()}
 
         {/* Row 4: Dynamic Day Quick Selector & Safety Notice */}
-        <div className="pt-2 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs border-t border-gold-500/20">
+        <div className={`pt-2 flex flex-col md:flex-row md:items-center ${showSelectDay ? "justify-between" : "justify-end"} gap-3 text-xs border-t border-gold-500/20`}>
           
-          {/* Day Selector Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-            <span className="text-[11px] font-bold text-gold-300 whitespace-nowrap mr-1">
-              {language === "mr" ? "दिवस निवडा:" : "Select Day:"}
-            </span>
-            {daysList.map((item, idx) => {
-              const isSelected = idx === selectedDayIdx;
-              const isCurrent = item.isCurrentDay;
-              const dNum = item.dayNumber || (idx + 1);
+          {/* Day Selector Pills (Admin ON/OFF control) */}
+          {showSelectDay && (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              <span className="text-[11px] font-bold text-gold-300 whitespace-nowrap mr-1">
+                {language === "mr" ? "दिवस निवडा:" : "Select Day:"}
+              </span>
+              {resolvedDays.map((item, idx) => {
+                const isSelected = idx === selectedDayIdx;
+                const isCurrent = item.isCurrentDay;
+                const dNum = item.dayNumber || (idx + 1);
+                const dNumDisplay = language === "mr" ? toMarathiNumeral(dNum) : dNum;
 
-              return (
-                <button
-                  key={item.id || idx}
-                  onClick={() => setSelectedDayIdx(idx)}
-                  className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border whitespace-nowrap cursor-pointer ${
-                    isSelected
-                      ? "bg-gold-400 text-maroon-950 border-gold-300 shadow-md font-black"
-                      : "bg-maroon-950/70 text-gold-200 hover:bg-maroon-850 border-gold-500/30"
-                  }`}
-                  title={`${item.dateStr || `Day ${dNum}`} - ${item.festivalDayLabel || item.headline || ""}`}
-                >
-                  <span>{t("day")} {dNum}</span>
-                  {isCurrent && (
-                    <span className="ml-1 text-[9px] px-1 py-0.2 rounded-full font-black bg-red-600 text-white">
-                      {language === "mr" ? "आज" : "Today"}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <button
+                    key={item.id || idx}
+                    onClick={() => setSelectedDayIdx(idx)}
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border whitespace-nowrap cursor-pointer ${
+                      isSelected
+                        ? "bg-gold-400 text-maroon-950 border-gold-300 shadow-md font-black"
+                        : "bg-maroon-950/70 text-gold-200 hover:bg-maroon-850 border-gold-500/30"
+                    }`}
+                    title={`${item.dateStr || `Day ${dNum}`} - ${item.festivalDayLabel || item.headline || ""}`}
+                  >
+                    <span>{t("day")} {dNumDisplay}</span>
+                    {showTodayBadge && isCurrent && (
+                      <span className="ml-1 text-[9px] px-1 py-0.2 rounded-full font-black bg-red-600 text-white">
+                        {language === "mr" ? "आज" : "Today"}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Safety Tip Pill */}
           <div className="flex items-center gap-1.5 text-[11px] text-emerald-300 bg-emerald-950/40 border border-emerald-500/30 px-3 py-1 rounded-full flex-shrink-0">

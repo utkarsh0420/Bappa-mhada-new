@@ -117,6 +117,11 @@ const newsletterSchema = new mongoose.Schema({
   eventDurationMr: { type: String, default: "१ दिवसीय सोहळा" },
   festivalName: { type: String, default: "Ganesh Utsav - 16 Sep" },
   festivalNameMr: { type: String, default: "गणेश उत्सव - १६ सप्टेंबर" },
+  startDate: { type: String, default: "2026-09-07" },
+  endDate: { type: String, default: "2026-09-16" },
+  showSelectDay: { type: Boolean, default: true },
+  showTodayBadge: { type: Boolean, default: true },
+  showCurrentDay: { type: Boolean, default: true },
   days: { type: [mongoose.Schema.Types.Mixed], default: [] },
   enabled: { type: Boolean, default: true }
 }, { _id: false, strict: false });

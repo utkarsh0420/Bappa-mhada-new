@@ -91,6 +91,12 @@ const DEFAULT_CONFIG = {
   },
   dailyAartiSchedule: [],
   newsletter: {
+    enabled: true,
+    startDate: "2026-09-07",
+    endDate: "2026-09-16",
+    showSelectDay: true,
+    showTodayBadge: true,
+    showCurrentDay: true,
     edition: "",
     dateStr: "",
     headline: "",

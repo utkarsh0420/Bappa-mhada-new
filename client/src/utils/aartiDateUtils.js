@@ -341,3 +341,29 @@ export const calculateAartiCountdown = ({
     totalDays: dayInfo.totalDays
   };
 };
+
+// Convert western digits to Marathi numerals
+export const toMarathiNumeral = (num) => {
+  const marathiDigits = ["०", "१", "२", "३", "४", "५", "६", "७", "८", "९"];
+  return String(num).split("").map((c) => marathiDigits[Number(c)] !== undefined ? marathiDigits[Number(c)] : c).join("");
+};
+
+// Helper to format "YYYY-MM-DD" string into readable English or Marathi date
+export const formatKolkataDateString = (dateStr, lang = "en", includeYear = false) => {
+  if (!dateStr || typeof dateStr !== "string" || !dateStr.includes("-")) return dateStr || "";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const monthsEn = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthsMr = ["जानेवारी", "फेब्रुवारी", "मार्च", "एप्रिल", "मे", "जून", "जुलै", "ऑगस्ट", "सप्टेंबर", "ऑक्टोबर", "नोव्हेंबर", "डिसेंबर"];
+  const monthIdx = (m >= 1 && m <= 12) ? m - 1 : 0;
+
+  if (lang === "mr") {
+    const dMr = toMarathiNumeral(String(d).padStart(2, "0"));
+    const mMr = monthsMr[monthIdx];
+    const yMr = toMarathiNumeral(y);
+    return includeYear ? `${dMr} ${mMr} ${yMr}` : `${dMr} ${mMr}`;
+  }
+
+  const dEn = String(d).padStart(2, "0");
+  const mEn = monthsEn[monthIdx];
+  return includeYear ? `${dEn} ${mEn} ${y}` : `${dEn} ${mEn}`;
+};

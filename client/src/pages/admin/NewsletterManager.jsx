@@ -10,6 +10,12 @@ import {
 } from "./FestiveControls";
 import { useLanguage } from "../../context/LanguageContext";
 import { formatNewsletterBroadcast, openWhatsApp } from "../../utils/whatsappFormatter";
+import { 
+  getKolkataDate, 
+  calculateFestivalDay, 
+  diffInDays, 
+  formatKolkataDateString 
+} from "../../utils/aartiDateUtils";
 
 const CATEGORY_OPTIONS = [
   { value: "aarti", labelMr: "महाआरती व विधी (Aarti)", labelEn: "Daily Maha Aarti & Rituals", icon: Flame, color: "text-orange-400" },
@@ -147,6 +153,11 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
   // Main Form State
   const [form, setForm] = useState({
     enabled: true,
+    startDate: "2026-09-07",
+    endDate: "2026-09-16",
+    showSelectDay: true,
+    showTodayBadge: true,
+    showCurrentDay: true,
     displayStyle: "classic",
     bulletinTitle: "DAILY DIGITAL BULLETIN",
     bulletinTitleMr: "दैनिक डिजिटल वृत्तपत्र",
@@ -220,6 +231,11 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
 
       setForm({
         enabled,
+        startDate: nl.startDate || "2026-09-07",
+        endDate: nl.endDate || "2026-09-16",
+        showSelectDay: nl.showSelectDay !== undefined ? Boolean(nl.showSelectDay) : true,
+        showTodayBadge: nl.showTodayBadge !== undefined ? Boolean(nl.showTodayBadge) : true,
+        showCurrentDay: nl.showCurrentDay !== undefined ? Boolean(nl.showCurrentDay) : true,
         displayStyle: nl.displayStyle || "classic",
         bulletinTitle: nl.bulletinTitle || "DAILY DIGITAL BULLETIN",
         bulletinTitleMr: nl.bulletinTitleMr || "दैनिक डिजिटल वृत्तपत्र",
@@ -524,10 +540,27 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
   // -------------------------------------------------------------
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+
+    // Date range validation
+    if (!form.startDate || !form.endDate) {
+      if (onNotify) onNotify(isEn ? "Please configure both Start Date and End Date" : "कृपया सुरूवात आणि समाप्ती तारीख दोन्ही भरा", "error");
+      return;
+    }
+
+    if (form.endDate < form.startDate) {
+      if (onNotify) onNotify(isEn ? "End Date cannot be earlier than Start Date" : "समाप्ती तारीख सुरूवातीच्या तारखेच्या आधी असू शकत नाही", "error");
+      return;
+    }
+
     setIsSaving(true);
 
     const payload = {
       ...form,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      showSelectDay: form.showSelectDay !== false,
+      showTodayBadge: form.showTodayBadge !== false,
+      showCurrentDay: form.showCurrentDay !== false,
       // Backward-compatible mirror fields
       edition: form.bulletinTitleMr || form.bulletinTitle,
       editionEn: form.eventDuration,
@@ -595,7 +628,7 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
         <div className="p-4 bg-amber-50/80 rounded-2xl border-2 border-gold-300 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-black uppercase text-maroon-950 font-heading block mb-0.5">
-              {isEn ? "1. Section Visibility Control" : "१. डिजिटल वृत्तपत्र दृश्यमानता (ON / OFF)"}
+              {isEn ? "1. Section Visibility Control (Master ON / OFF)" : "१. डिजिटल वृत्तपत्र दृश्यमानता (Master ON / OFF)"}
             </span>
             <p className="text-xs text-stone-600">
               {isEn 
@@ -624,11 +657,154 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
           </div>
         </div>
 
-        {/* SECTION 2: 4 Display Styles Selector */}
+        {/* SECTION 2: Newsletter Period & Automatic Date Range */}
+        <div className="p-4 bg-[#FFFDF9] rounded-2xl border-2 border-gold-300 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gold-200 pb-2">
+            <div>
+              <span className="text-xs font-black uppercase text-maroon-950 font-heading block mb-0.5">
+                {isEn ? "2. Newsletter Active Period (Automatic Date / Day)" : "२. उत्सव कालावधी (स्वयंचलित दिवस व तारीख)"}
+              </span>
+              <p className="text-xs text-stone-600">
+                {isEn 
+                  ? "Configure the period once. The website automatically calculates Current Day = Current Date - Start Date + 1 every morning in Asia/Kolkata timezone."
+                  : "कालावधी एकदाच निवडा. वेबसाईट दररोज सकाळी भारतीय प्रमाणवेळेनुसार (Asia/Kolkata) चालू दिवसाची स्वयंचलित गणना करेल."}
+              </p>
+            </div>
+
+            {/* Live Period Status Pill */}
+            {form.startDate && form.endDate && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-900 border border-gold-400 shadow-xs">
+                  <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                  <span>
+                    {isEn 
+                      ? `Total: ${Math.max(0, diffInDays(form.endDate, form.startDate) + 1)} Days` 
+                      : `एकूण: ${Math.max(0, diffInDays(form.endDate, form.startDate) + 1)} दिवस`}
+                  </span>
+                </span>
+
+                {(() => {
+                  const dayCalc = calculateFestivalDay(form.startDate, form.endDate, getKolkataDate());
+                  if (dayCalc.status === "upcoming") {
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-black bg-sky-100 text-sky-800 border border-sky-300 px-2.5 py-1 rounded-full">
+                        <Clock className="w-3 h-3 text-sky-600" />
+                        <span>{isEn ? `Upcoming (${dayCalc.daysUntil} days left)` : `आगामी (${dayCalc.daysUntil} दिवस बाकी)`}</span>
+                      </span>
+                    );
+                  }
+                  if (dayCalc.status === "active") {
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-full">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>{isEn ? `Live Now: Day ${dayCalc.currentDay}` : `सुरू आहे: दिवस ${dayCalc.currentDay}`}</span>
+                      </span>
+                    );
+                  }
+                  if (dayCalc.status === "concluded") {
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-black bg-stone-100 text-stone-700 border border-stone-300 px-2.5 py-1 rounded-full">
+                        <span>{isEn ? "Festival Concluded" : "उत्सव सांगता"}</span>
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FestiveInput
+              label={isEn ? "Start Date (प्रारंभ तारीख) *" : "सुरूवात तारीख (Start Date) *"}
+              type="date"
+              icon={Calendar}
+              value={form.startDate}
+              onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+              required
+            />
+            <FestiveInput
+              label={isEn ? "End Date (समाप्ती तारीख) *" : "समाप्ती तारीख (End Date) *"}
+              type="date"
+              icon={Calendar}
+              value={form.endDate}
+              onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+              required
+            />
+          </div>
+        </div>
+
+        {/* SECTION 3: Display Options */}
+        <div className="p-4 bg-[#FFFDF9] rounded-2xl border-2 border-gold-300 shadow-xs space-y-4">
+          <span className="text-xs font-black uppercase text-maroon-950 font-heading block">
+            {isEn ? "3. Display Options (दृश्यमानता पर्याय)" : "३. प्रदर्शन पर्याय (Display Options)"}
+          </span>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Show Select Day */}
+            <div className="p-3 bg-amber-50/60 rounded-xl border border-gold-200 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-extrabold text-maroon-950 block">
+                  {isEn ? "Show Select Day Section" : "'दिवस निवडा' विभाग दाखवा"}
+                </span>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  {isEn ? "Show Day 1, Day 2... selector pills at bottom" : "तळाशी दिवस १, दिवस २... निवड बटणे दाखवा"}
+                </p>
+              </div>
+              <FestiveToggle
+                checked={form.showSelectDay !== false}
+                onChange={(val) => setForm(prev => ({ ...prev, showSelectDay: val }))}
+                activeText={isEn ? "ON" : "सुरू"}
+                inactiveText={isEn ? "OFF" : "बंद"}
+                size="sm"
+              />
+            </div>
+
+            {/* Show Today Badge */}
+            <div className="p-3 bg-amber-50/60 rounded-xl border border-gold-200 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-extrabold text-maroon-950 block">
+                  {isEn ? "Show Today Badge" : "'आजचा दिवस' बॅज दाखवा"}
+                </span>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  {isEn ? "Show pulsing Today's Day indicator on active day" : "चालू दिवशी 'Today's Day' चमकणारा बॅज दाखवा"}
+                </p>
+              </div>
+              <FestiveToggle
+                checked={form.showTodayBadge !== false}
+                onChange={(val) => setForm(prev => ({ ...prev, showTodayBadge: val }))}
+                activeText={isEn ? "ON" : "सुरू"}
+                inactiveText={isEn ? "OFF" : "बंद"}
+                size="sm"
+              />
+            </div>
+
+            {/* Show Current Day */}
+            <div className="p-3 bg-amber-50/60 rounded-xl border border-gold-200 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-extrabold text-maroon-950 block">
+                  {isEn ? "Show Current Day in Header" : "मथळ्यात चालू दिवस दाखवा"}
+                </span>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  {isEn ? "Display active day calculation in bulletin header" : "वृत्तपत्राच्या मुख्य मथळ्यात दिवसाची गणना दाखवा"}
+                </p>
+              </div>
+              <FestiveToggle
+                checked={form.showCurrentDay !== false}
+                onChange={(val) => setForm(prev => ({ ...prev, showCurrentDay: val }))}
+                activeText={isEn ? "ON" : "सुरू"}
+                inactiveText={isEn ? "OFF" : "बंद"}
+                size="sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 4: 4 Display Styles Selector */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-black uppercase text-maroon-950 font-heading">
-              {isEn ? "2. Choose Display Style (4 Options)" : "२. माहिती प्रदर्शन शैली निवडा (४ पर्याय)"}
+              {isEn ? "4. Choose Display Style (4 Options)" : "४. माहिती प्रदर्शन शैली निवडा (४ पर्याय)"}
             </label>
             <span className="text-[11px] text-stone-500 font-semibold">
               {isEn ? "Active Style: " : "निवडलेली शैली: "}
@@ -678,10 +854,10 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
           </div>
         </div>
 
-        {/* SECTION 3: General Bulletin Info */}
+        {/* SECTION 5: General Bulletin Info */}
         <div className="p-4 bg-[#FFFDF9] rounded-2xl border-2 border-gold-300 shadow-xs space-y-4">
           <span className="text-xs font-black uppercase text-maroon-950 font-heading block">
-            {isEn ? "3. Bulletin Header & General Information" : "३. मुख्य मथळा व सर्वसाधारण माहिती"}
+            {isEn ? "5. Bulletin Header & General Information" : "५. मुख्य मथळा व सर्वसाधारण माहिती"}
           </span>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -754,12 +930,12 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
           </div>
         </div>
 
-        {/* SECTION 4: Dynamic Days Management */}
+        {/* SECTION 6: Dynamic Days Management */}
         <div className="p-4 bg-[#FFFDF9] rounded-2xl border-2 border-gold-300 shadow-xs space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <span className="text-xs font-black uppercase text-maroon-950 font-heading block">
-                {isEn ? "4. Festival Day Management (Select Day to Edit)" : "४. उत्सव दिवस व्यवस्थापन (माहिती भरण्यासाठी दिवस निवडा)"}
+                {isEn ? "6. Festival Day Management (Select Day to Edit)" : "६. उत्सव दिवस व्यवस्थापन (माहिती भरण्यासाठी दिवस निवडा)"}
               </span>
               <p className="text-[11px] text-stone-500">
                 {isEn 
@@ -873,14 +1049,14 @@ const NewsletterManager = ({ config, onSaveNewsletter, onNotify }) => {
           </div>
         </div>
 
-        {/* SECTION 5: Information Blocks for Selected Day */}
+        {/* SECTION 7: Information Blocks for Selected Day */}
         <div className="p-4 bg-[#FFFDF9] rounded-2xl border-2 border-gold-300 shadow-xs space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gold-200">
             <div>
               <span className="text-xs font-black uppercase text-maroon-950 font-heading block">
                 {isEn 
-                  ? `5. Information Blocks for Day ${currentDay.dayNumber || selectedDayIdx + 1}` 
-                  : `५. दिवस ${currentDay.dayNumber || selectedDayIdx + 1} चे माहिती ब्लॉक्स (${currentBlocks.length})`}
+                  ? `7. Information Blocks for Day ${currentDay.dayNumber || selectedDayIdx + 1}` 
+                  : `७. दिवस ${currentDay.dayNumber || selectedDayIdx + 1} चे माहिती ब्लॉक्स (${currentBlocks.length})`}
               </span>
               <p className="text-[11px] text-stone-500">
                 {isEn 
