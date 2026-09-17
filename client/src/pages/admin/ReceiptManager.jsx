@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { 
   Receipt, PlusCircle, History, Settings, Sparkles, Download, 
   Printer, Eye, RefreshCw, Upload, Trash2, CheckCircle2, 
   AlertCircle, Search, Calendar, User, Home, Building2, 
   CreditCard, FileText, IndianRupee, ShieldCheck, X,
-  Lock, Unlock, Archive, RotateCcw, ShieldAlert
+  Lock, Unlock, Archive, RotateCcw, ShieldAlert,
+  MessageCircle, Phone
 } from "lucide-react";
 import API from "../../services/api";
 import { useLanguage } from "../../context/LanguageContext";
+import { useAuth } from "../../context/AuthContext";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import ReceiptDocument from "../../components/receipt/ReceiptDocument";
 
 // Number to Words in Indian English
 const numberToWordsIndian = (num) => {
@@ -68,6 +72,8 @@ const BUILDING_OPTIONS = [
 const ReceiptManager = ({ config, onNotify }) => {
   const { language } = useLanguage();
   const isEn = language === "en";
+  const { admin } = useAuth();
+  const isAdminAuthorized = Boolean(admin);
 
   const [activeTab, setActiveTab] = useState("generate"); // 'generate' | 'history' | 'archive' | 'settings'
 
@@ -131,6 +137,21 @@ const ReceiptManager = ({ config, onNotify }) => {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const receiptVoucherRef = useRef(null);
+
+  // WhatsApp Share State
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [whatsappRecipientPhone, setWhatsappRecipientPhone] = useState("");
+  const [isSharingWhatsApp, setIsSharingWhatsApp] = useState(false);
+
+  // Sync body class for print visibility scoping
+  useEffect(() => {
+    if (isPreviewModalOpen && previewReceipt) {
+      document.body.classList.add("receipt-preview-active");
+      return () => {
+        document.body.classList.remove("receipt-preview-active");
+      };
+    }
+  }, [isPreviewModalOpen, previewReceipt]);
 
   // Autocomplete resident suggestions from previous receipts
   const [nameSuggestions, setNameSuggestions] = useState([]);
@@ -364,57 +385,65 @@ const ReceiptManager = ({ config, onNotify }) => {
     return null;
   };
 
-  // Generate & Download PDF with proportional A4 fit (Never crops bottom/signature)
+  // Build high-resolution A4 jsPDF instance and blob from receipt element
+  const buildPdfDocument = async (targetReceipt) => {
+    if (!isPreviewModalOpen) {
+      setPreviewReceipt(targetReceipt);
+      setIsPreviewModalOpen(true);
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    const element = receiptVoucherRef.current;
+    if (!element) throw new Error("Receipt element not found");
+
+    const canvas = await html2canvas(element, {
+      scale: 2.5,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#FFFFFF",
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4"
+    });
+
+    const pageWidth = pdf.internal.pageSize.getWidth(); // 210mm
+    const pageHeight = pdf.internal.pageSize.getHeight(); // 297mm
+    const margin = 10; // 10mm margins on all sides
+    const maxW = pageWidth - (margin * 2); // 190mm
+    const maxH = pageHeight - (margin * 2); // 277mm
+
+    let renderW = maxW;
+    let renderH = (canvas.height * renderW) / canvas.width;
+
+    // Scale down proportionally if height exceeds A4 printable area
+    if (renderH > maxH) {
+      renderH = maxH;
+      renderW = (canvas.width * renderH) / canvas.height;
+    }
+
+    const xOffset = margin + (maxW - renderW) / 2;
+    const yOffset = margin + (maxH - renderH) / 2;
+
+    pdf.addImage(imgData, "PNG", xOffset, yOffset, renderW, renderH, undefined, "FAST");
+    const safeFilename = `Receipt_${(targetReceipt.receiptNo || "MT").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+    const pdfBlob = pdf.output("blob");
+
+    return { pdf, pdfBlob, safeFilename };
+  };
+
+  // Generate & Download PDF with proportional A4 fit
   const handleDownloadPdf = async (receiptData) => {
     const targetReceipt = receiptData || previewReceipt;
     if (!targetReceipt) return;
 
     setIsGeneratingPdf(true);
     try {
-      if (!isPreviewModalOpen) {
-        setPreviewReceipt(targetReceipt);
-        setIsPreviewModalOpen(true);
-        await new Promise((r) => setTimeout(r, 200));
-      }
-
-      const element = receiptVoucherRef.current;
-      if (!element) throw new Error("Receipt element not found");
-
-      const canvas = await html2canvas(element, {
-        scale: 2.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#FFFFFF",
-        logging: false
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-      });
-
-      const pageWidth = pdf.internal.pageSize.getWidth(); // 210mm
-      const pageHeight = pdf.internal.pageSize.getHeight(); // 297mm
-      const margin = 10; // 10mm margins on all sides
-      const maxW = pageWidth - (margin * 2); // 190mm
-      const maxH = pageHeight - (margin * 2); // 277mm
-
-      let renderW = maxW;
-      let renderH = (canvas.height * renderW) / canvas.width;
-
-      // Scale down proportionally if height exceeds A4 printable area
-      if (renderH > maxH) {
-        renderH = maxH;
-        renderW = (canvas.width * renderH) / canvas.height;
-      }
-
-      const xOffset = margin + (maxW - renderW) / 2;
-      const yOffset = margin + (maxH - renderH) / 2;
-
-      pdf.addImage(imgData, "PNG", xOffset, yOffset, renderW, renderH, undefined, "FAST");
-      const safeFilename = `Receipt_${(targetReceipt.receiptNo || "MT").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+      const { pdf, safeFilename } = await buildPdfDocument(targetReceipt);
       pdf.save(safeFilename);
 
       if (onNotify) onNotify(isEn ? `Downloaded ${safeFilename}` : `पावती PDF डाऊनलोड झाली: ${safeFilename}`, "success");
@@ -438,9 +467,138 @@ const ReceiptManager = ({ config, onNotify }) => {
     }
   };
 
-  // Direct Print
+  // Direct Dedicated A4 Print
   const handlePrint = () => {
+    document.body.classList.add("receipt-print-active");
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove("receipt-print-active");
+    }, 1000);
+  };
+
+  // Generate WhatsApp Message
+  const generateWhatsAppMessage = (receipt) => {
+    if (!receipt) return "";
+    const societyMr = receipt.societyNameMr || config?.mandalNameMr || "म्हाडा टॉवर्स उत्सव मंडळ";
+    const societyEn = receipt.societyNameEn || config?.mandalNameEn || "MHADA Towers Utsav Mandal";
+    const formattedAmt = Number(receipt.amount || 0).toLocaleString("en-IN");
+
+    return `॥ श्री गणेशाय नमः ॥
+*${societyMr}*
+*${societyEn}*
+पिंपरी वाघेरे, पुणे - ४११०१७
+
+सस्नेह नमस्कार,
+आपल्या गणेशोत्सव वर्गणीची अधिकृत पावती तपशील:
+
+📋 *पावती क्र. / Receipt No:* ${receipt.receiptNo}
+📅 *दिनांक / Date:* ${receipt.paymentDate}
+👤 *नाव / Received From:* ${receipt.residentName}
+🏠 *फ्लॅट / Flat:* ${receipt.flatNo} (${receipt.building})
+💰 *रक्कम / Amount:* ₹${formattedAmt}/-
+📝 *कारणास्तव / Purpose:* ${receipt.purpose}
+💳 *पेमेंट पद्धत / Mode:* ${receipt.paymentMode || "UPI"}
+
+मंडळाच्या सर्व उपक्रमात सहकार्य केल्याबद्दल सस्नेह धन्यवाद! 🙏
+_म्हाडा टॉवर्स उत्सव मंडळ_`;
+  };
+
+  // Open WhatsApp Modal
+  const handleOpenWhatsAppModal = (receipt) => {
+    const target = receipt || previewReceipt;
+    if (!target) return;
+    setWhatsappRecipientPhone(target.residentMobile || target.mobile || target.phone || "");
+    setIsWhatsAppModalOpen(true);
+  };
+
+  // Execute WhatsApp Sharing (Native File Share or Desktop WhatsApp Web Fallback)
+  const handleExecuteWhatsAppShare = async () => {
+    if (!previewReceipt) return;
+    setIsSharingWhatsApp(true);
+
+    try {
+      const messageText = generateWhatsAppMessage(previewReceipt);
+      const cleanPhone = (whatsappRecipientPhone || "").replace(/\D/g, "");
+
+      // 1. Generate PDF blob and file
+      let pdfBlob = null;
+      let pdfDoc = null;
+      let safeFilename = `Receipt_${(previewReceipt.receiptNo || "MT").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+
+      try {
+        const built = await buildPdfDocument(previewReceipt);
+        pdfDoc = built.pdf;
+        pdfBlob = built.pdfBlob;
+        safeFilename = built.safeFilename;
+      } catch (pdfErr) {
+        console.warn("[WhatsApp Share] PDF build warning, proceeding with text message:", pdfErr);
+      }
+
+      // 2. Native Web Share with PDF File (Mobile & supported browsers)
+      if (pdfBlob && typeof navigator !== "undefined" && navigator.canShare) {
+        const pdfFile = new File([pdfBlob], safeFilename, { type: "application/pdf" });
+        if (navigator.canShare({ files: [pdfFile] })) {
+          try {
+            await navigator.share({
+              title: `Receipt - ${previewReceipt.receiptNo}`,
+              text: messageText,
+              files: [pdfFile]
+            });
+            if (onNotify) {
+              onNotify(
+                isEn ? "Receipt shared via device share sheet!" : "पावती यशस्वीरीत्या शेअर केली!",
+                "success"
+              );
+            }
+            setIsWhatsAppModalOpen(false);
+            return;
+          } catch (shareErr) {
+            if (shareErr.name === "AbortError") {
+              setIsSharingWhatsApp(false);
+              return;
+            }
+            console.warn("[WhatsApp Share] Native share failed, falling back to WhatsApp Web:", shareErr);
+          }
+        }
+      }
+
+      // 3. Desktop / Web Fallback: Download PDF + Open WhatsApp Web with pre-filled message
+      if (pdfDoc) {
+        pdfDoc.save(safeFilename);
+      }
+
+      const encodedMsg = encodeURIComponent(messageText);
+      let waUrl = "";
+      if (cleanPhone && cleanPhone.length >= 10) {
+        const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+        waUrl = `https://api.whatsapp.com/send?phone=${fullPhone}&text=${encodedMsg}`;
+      } else {
+        waUrl = `https://api.whatsapp.com/send?text=${encodedMsg}`;
+      }
+
+      window.open(waUrl, "_blank", "noopener,noreferrer");
+
+      if (onNotify) {
+        onNotify(
+          isEn
+            ? "Receipt PDF downloaded! WhatsApp opened with details. Please attach the downloaded PDF file."
+            : "पावती PDF डाऊनलोड झाली आहे! व्हॉट्सॲप सुरू झाले आहे, कृपया डाऊनलोड केलेली PDF फाईल सोबत जोडा.",
+          "success"
+        );
+      }
+
+      setIsWhatsAppModalOpen(false);
+    } catch (err) {
+      console.error("[ReceiptManager] WhatsApp sharing error:", err);
+      if (onNotify) {
+        onNotify(
+          isEn ? "Failed to share on WhatsApp" : "व्हॉट्सॲप शेअर करताना त्रुटी आली",
+          "error"
+        );
+      }
+    } finally {
+      setIsSharingWhatsApp(false);
+    }
   };
 
   // Reset Form
@@ -1611,6 +1769,16 @@ const ReceiptManager = ({ config, onNotify }) => {
                   <Download className="w-3.5 h-3.5" />
                   <span>{isGeneratingPdf ? "Generating..." : (isEn ? "Download PDF" : "PDF डाऊनलोड")}</span>
                 </button>
+                {isAdminAuthorized && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenWhatsAppModal(previewReceipt)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{isEn ? "WhatsApp" : "व्हॉट्सॲप"}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsPreviewModalOpen(false)}
@@ -1623,180 +1791,14 @@ const ReceiptManager = ({ config, onNotify }) => {
 
             {/* Scrollable Receipt Body */}
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-stone-100/80 flex justify-center items-start">
-              
-              {/* THE OFFICIAL RECEIPT VOUCHER (This DOM node is captured for PDF) */}
-              <div
-                ref={receiptVoucherRef}
-                id="society-official-receipt-voucher"
-                className="w-full max-w-[640px] bg-white border-2 border-maroon-900 p-5 sm:p-7 rounded-xl shadow-md text-maroon-950 font-body relative box-border"
-                style={{ backgroundColor: "#FFFFFF", boxSizing: "border-box" }}
-              >
-                {/* Inner Decorative Gold Border */}
-                <div 
-                  className="border-1.5 border-gold-500 p-4 sm:p-6 rounded-lg relative box-border bg-white flex flex-col space-y-3.5"
-                  style={{ boxSizing: "border-box" }}
-                >
-                  
-                  {/* Top Society Header */}
-                  <div className="flex items-center justify-between gap-4 border-b-2 border-maroon-900 pb-3">
-                    <img
-                      src="/logo.jpg"
-                      alt="Society Logo"
-                      className="w-20 h-20 sm:w-22 sm:h-22 object-cover rounded-lg border border-gold-400 flex-shrink-0 shadow-xs"
-                    />
-                    <div className="text-center flex-grow">
-                      <div className="text-xs font-bold text-amber-700 tracking-widest uppercase">
-                        ॥ श्री गणेशाय नमः ॥
-                      </div>
-                      <h1 className="text-lg sm:text-xl font-black font-heading text-maroon-950 leading-tight">
-                        {previewReceipt.societyNameMr || config?.mandalNameMr || "म्हाडा टॉवर्स उत्सव मंडळ"}
-                      </h1>
-                      <h2 className="text-xs sm:text-sm font-bold text-maroon-800 tracking-wide font-heading">
-                        {previewReceipt.societyNameEn || config?.mandalNameEn || "MHADA Towers Utsav Mandal"}
-                      </h2>
-                      <p className="text-[10px] sm:text-xs text-stone-600 mt-0.5">
-                        {previewReceipt.addressMr || config?.addressMr || "पिंपरी वाघेरे, पिंपरी चिंचवड, पुणे - ४११०१७"}
-                      </p>
-                      <p className="text-[10px] text-amber-800 font-bold mt-0.5">
-                        धर्मादाय नोंदणी क्र. {previewReceipt.regNo || config?.regNo || "१२४३/२०२५ - पुणे"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Receipt Badge Header */}
-                  <div className="text-center my-0.5">
-                    <span className="inline-block bg-gradient-to-r from-maroon-900 to-maroon-850 text-gold-300 font-heading text-xs sm:text-sm font-black px-6 py-1 rounded-full uppercase tracking-wider shadow-xs">
-                      पावती / OFFICIAL RECEIPT
-                    </span>
-                  </div>
-
-                  {/* Metadata Row: Receipt Book No & Date */}
-                  <div className="flex justify-between items-center text-xs py-2 px-3 bg-gold-50/80 border border-gold-300 rounded font-mono font-bold text-maroon-950">
-                    <div>
-                      <span>पावती पुस्तक क्रमांक / Receipt No: </span>
-                      <span className="text-maroon-900 font-black">{previewReceipt.receiptNo}</span>
-                    </div>
-                    <div>
-                      <span>दिनांक / Date: </span>
-                      <span className="text-maroon-900 font-black">{previewReceipt.paymentDate}</span>
-                    </div>
-                  </div>
-
-                  {/* Resident Info Box */}
-                  <div className="space-y-2.5 text-xs sm:text-sm border-b border-stone-200 pb-3.5">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-1">
-                      <span className="font-bold text-stone-600 sm:w-48 flex-shrink-0">
-                        श्री / श्रीमती / M/s (Received From):
-                      </span>
-                      <span className="font-black text-maroon-950 font-heading text-sm sm:text-base border-b border-dotted border-stone-400 flex-grow break-words">
-                        {previewReceipt.residentName}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-bold text-stone-600 flex-shrink-0">फ्लॅट क्र. / Flat No:</span>
-                        <span className="font-black text-maroon-900 font-mono border-b border-dotted border-stone-400 flex-grow">
-                          {previewReceipt.flatNo}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-bold text-stone-600 flex-shrink-0">इमारत / Building:</span>
-                        <span className="font-bold text-maroon-900 border-b border-dotted border-stone-400 flex-grow break-words">
-                          {previewReceipt.building}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-1">
-                      <span className="font-bold text-stone-600 sm:w-48 flex-shrink-0">
-                        कारणास्तव / On Account Of (Purpose):
-                      </span>
-                      <span className="font-bold text-maroon-950 border-b border-dotted border-stone-400 flex-grow break-words">
-                        {previewReceipt.purpose}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-bold text-stone-600 flex-shrink-0">पेमेंट पद्धत / Mode:</span>
-                        <span className="font-bold text-stone-900">
-                          {previewReceipt.paymentMode}
-                        </span>
-                      </div>
-                      {previewReceipt.transactionRef && (
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-bold text-stone-600 flex-shrink-0">धनादेश / संदर्भ क्र. / Txn Ref:</span>
-                          <span className="font-mono text-stone-900 break-all">
-                            {previewReceipt.transactionRef}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Amount Box */}
-                  <div className="p-3 bg-gradient-to-r from-amber-50/90 via-gold-50/50 to-amber-50/80 border-2 border-gold-400 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 box-border">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600 block">
-                        प्राप्त रक्कम / Amount Received:
-                      </span>
-                      <span className="text-xl sm:text-2xl font-black text-maroon-950 tracking-tight">
-                        ₹ {Number(previewReceipt.amount).toLocaleString("en-IN")}/-
-                      </span>
-                    </div>
-                    <div className="text-left sm:text-right">
-                      <span className="text-[10px] text-stone-500 block uppercase font-bold">रक्कम अक्षरी / In Words:</span>
-                      <span className="text-xs font-bold text-maroon-900 italic font-heading break-words">
-                        {previewReceipt.amountInWords || numberToWordsIndian(previewReceipt.amount)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Description Acknowledgement Note */}
-                  {previewReceipt.description && (
-                    <div className="p-2.5 bg-stone-50 border border-stone-200 rounded text-xs text-stone-800 leading-relaxed italic break-words">
-                      "{previewReceipt.description}"
-                    </div>
-                  )}
-
-                  {/* Signature and Footer Section */}
-                  <div className="border-t-2 border-maroon-900 pt-3 flex justify-between items-end gap-3">
-                    <div className="text-[10px] text-stone-500 max-w-[280px] leading-tight space-y-0.5">
-                      <p className="font-bold text-stone-700">नोंद / Notes & Conditions:</p>
-                      <p>• ही अधिकृत संगणकीय पावती आहे.</p>
-                      <p>• धनादेश/ऑनलाइन ट्रान्सफर रकमेच्या वटण्यावर आधारित.</p>
-                      <p>• मंडळाच्या सर्व उपक्रमात सहकार्य केल्याबद्दल सस्नेह धन्यवाद.</p>
-                    </div>
-
-                    {/* Digital Signature Box */}
-                    <div className="text-center min-w-[140px] space-y-1 flex-shrink-0">
-                      {previewReceipt.sachivSignatureUrl || receiptSettings.sachivSignatureUrl ? (
-                        <img
-                          src={previewReceipt.sachivSignatureUrl || receiptSettings.sachivSignatureUrl}
-                          alt="Digital Signature"
-                          className="h-12 max-w-[140px] object-contain mx-auto"
-                        />
-                      ) : (
-                        <div className="h-10 flex items-center justify-center text-[10px] text-stone-400 italic">
-                          (स्वाक्षरी / Signature)
-                        </div>
-                      )}
-                      <div className="border-t border-maroon-900 pt-1">
-                        {/* NO "SACHIV" TEXT LABEL! ONLY OFFICIAL TITLE */}
-                        <span className="text-[11px] text-maroon-900 font-bold block leading-tight">
-                          सचिव / अधिकृत स्वाक्षरी
-                        </span>
-                        <span className="text-[9px] text-stone-500 font-semibold block">
-                          Authorized Signatory
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
+              <div className="w-full max-w-[680px] my-auto">
+                <ReceiptDocument
+                  ref={receiptVoucherRef}
+                  receipt={previewReceipt}
+                  config={config}
+                  sachivSignatureUrl={receiptSettings.sachivSignatureUrl || previewReceipt.sachivSignatureUrl}
+                />
               </div>
-
             </div>
 
             {/* Modal Bottom Bar */}
@@ -1812,6 +1814,16 @@ const ReceiptManager = ({ config, onNotify }) => {
                 >
                   Close
                 </button>
+                {isAdminAuthorized && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenWhatsAppModal(previewReceipt)}
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>{isEn ? "Share on WhatsApp" : "व्हॉट्सॲपवर शेअर करा"}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleDownloadPdf(previewReceipt)}
@@ -1822,6 +1834,132 @@ const ReceiptManager = ({ config, onNotify }) => {
                   <span>{isGeneratingPdf ? "Generating..." : "Download Official PDF"}</span>
                 </button>
               </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED A4 PRINT PORTAL (Rendered directly into document.body, completely isolated from #root and UI) */}
+      {previewReceipt && createPortal(
+        <div id="receipt-print-portal">
+          <ReceiptDocument
+            receipt={previewReceipt}
+            config={config}
+            sachivSignatureUrl={receiptSettings.sachivSignatureUrl || previewReceipt.sachivSignatureUrl}
+            forPrint={true}
+          />
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL: ADMIN WHATSAPP SHARING CONFIRMATION */}
+      {isWhatsAppModalOpen && previewReceipt && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border-2 border-emerald-400 overflow-hidden animate-in fade-in zoom-in duration-150">
+            
+            {/* Modal Header */}
+            <div className="p-4 bg-gradient-to-r from-emerald-800 to-emerald-700 text-white flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-emerald-200" />
+                <h3 className="font-bold text-sm font-heading">
+                  {isEn ? "Share Official Receipt on WhatsApp" : "अधिकृत पावती व्हॉट्सॲपवर शेअर करा"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWhatsAppModalOpen(false)}
+                className="p-1 hover:bg-white/20 rounded-lg text-emerald-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 space-y-4 text-xs text-stone-700">
+              
+              {/* Receipt Quick Summary Box */}
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1">
+                <div className="flex justify-between font-bold text-emerald-950">
+                  <span>पावती क्र. / Receipt No:</span>
+                  <span className="font-mono">{previewReceipt.receiptNo}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">रहिवासी / Resident:</span>
+                  <span className="font-bold text-stone-900">{previewReceipt.residentName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-600">फ्लॅट / Flat:</span>
+                  <span className="font-mono text-stone-900">{previewReceipt.flatNo} ({previewReceipt.building})</span>
+                </div>
+                <div className="flex justify-between border-t border-emerald-200/80 pt-1 text-emerald-900 font-black">
+                  <span>प्राप्त रक्कम / Amount:</span>
+                  <span className="text-sm">₹ {Number(previewReceipt.amount || 0).toLocaleString("en-IN")}/-</span>
+                </div>
+              </div>
+
+              {/* Resident Phone Input (Optional) */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">
+                  {isEn ? "Resident Mobile Number (Optional):" : "रहिवाशाचा मोबाईल नंबर (पर्यायी):"}
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    placeholder="e.g. 9876543210 (10 digits)"
+                    value={whatsappRecipientPhone}
+                    onChange={(e) => setWhatsappRecipientPhone(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border border-stone-300 rounded-xl text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <p className="text-[10px] text-stone-500 mt-1">
+                  {isEn 
+                    ? "Leave blank to choose any contact or group inside WhatsApp." 
+                    : "नंबर न टाकल्यास आपण व्हॉट्सॲपवरील कोणत्याही संपर्कास किंवा ग्रुपला पावती पाठवू शकता."}
+                </p>
+              </div>
+
+              {/* Message Preview */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">
+                  {isEn ? "Message Preview:" : "संदेश पूर्वावलोकन:"}
+                </label>
+                <pre className="p-3 bg-stone-100 border border-stone-200 rounded-xl text-[11px] text-stone-800 font-sans whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed">
+                  {generateWhatsAppMessage(previewReceipt)}
+                </pre>
+              </div>
+
+              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[10.5px] text-amber-900 leading-snug">
+                {isEn
+                  ? "Tip: On mobile devices supporting document share, the official PDF file is attached directly. On desktop, the PDF is downloaded and WhatsApp Web opens with the text details."
+                  : "टीप: मोबाईलवर शेअर सपोर्ट असल्यास अधिकृत PDF थेट जोडली जाईल. संगणकावर PDF डाऊनलोड होईल व संदेशासह व्हॉट्सॲप वेब उघडेल."}
+              </div>
+
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsWhatsAppModalOpen(false)}
+                className="px-4 py-2 border border-stone-300 text-stone-700 rounded-xl text-xs font-bold hover:bg-stone-100 cursor-pointer"
+              >
+                {isEn ? "Cancel" : "रद्द करा"}
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteWhatsAppShare}
+                disabled={isSharingWhatsApp}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>
+                  {isSharingWhatsApp 
+                    ? (isEn ? "Preparing..." : "तयार करत आहे...") 
+                    : (isEn ? "Share via WhatsApp" : "व्हॉट्सॲपवर पाठवा")}
+                </span>
+              </button>
             </div>
 
           </div>
