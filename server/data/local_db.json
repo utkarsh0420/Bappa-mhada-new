@@ -14,7 +14,7 @@
       "resetTokenExpiresAt": null,
       "passwordChangedAt": "2026-09-17T13:07:23.706Z",
       "createdAt": "2026-09-14T14:31:23.330Z",
-      "updatedAt": "2026-09-17T13:37:21.749Z"
+      "updatedAt": "2026-09-20T10:18:22.913Z"
     }
   ],
   "config": {
@@ -537,7 +537,7 @@
       "endDate": "2026-09-25",
       "showSelectDay": true,
       "showTodayBadge": true,
-      "showCurrentDay": true
+      "showCurrentDay": false
     },
     "wings": [
       {
@@ -858,7 +858,7 @@
         }
       ]
     },
-    "updatedAt": "2026-09-17T12:37:15.079Z",
+    "updatedAt": "2026-09-20T10:23:00.181Z",
     "festivalScheduleCard": {
       "eventNameMr": "श्री गणेशोत्सव २०२६ (१० दिवसीय भव्य उत्सव)",
       "eventNameEn": "Shree Ganeshotsav 2026 (10-Day Grand Celebration)",
